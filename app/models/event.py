@@ -4,7 +4,7 @@ from enum import Enum
 
 class EventType(Enum):
     LOGIN_SUCCESS = "login_success"
-    LOGIN_FAILED = "login_failed"
+    LOGIN_FAILURE = "login_failed"
     UNKNOWN = "unknown"
 
 @dataclass(slots=True)
