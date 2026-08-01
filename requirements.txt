@@ -1,0 +1,40 @@
+# Web Framework
+fastapi
+uvicorn[standard]
+
+# Database
+sqlalchemy
+psycopg[binary]
+alembic
+
+# Validation & Configuration
+pydantic
+pydantic-settings
+python-dotenv
+
+# Authentication & Security
+python-jose[cryptography]
+passlib[argon2]
+python-multipart
+
+# AI
+openai
+ollama
+
+# HTTP Requests
+httpx
+
+# Data Processing
+pandas
+
+# Testing
+pytest
+pytest-asyncio
+
+# Code Quality
+black
+ruff
+mypy
+
+# Logging
+structlog
