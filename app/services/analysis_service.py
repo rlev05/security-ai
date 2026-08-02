@@ -5,7 +5,10 @@ from app.models.analysis import AnalysisResult
 from app.models.event import SecurityEvent
 
 
-def analyse_auth_log(content: str) -> AnalysisResult:
+def analyse_auth_log(
+        content: str,
+        default_year: int | None = None,
+) -> AnalysisResult:
     """Parse the authentication log and run all the detection rules"""
 
     if not content.strip():
@@ -21,7 +24,7 @@ def analyse_auth_log(content: str) -> AnalysisResult:
     ignored_lines = 0
 
     for line in lines:
-        event = parse_auth_log_line(line)
+        event = parse_auth_log_line(line, default_year=default_year)
 
         if event is None:
             ignored_lines += 1
