@@ -1,0 +1,44 @@
+from collections.abc import Generator
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+
+from app.core.config import get_settings
+
+
+class Base(DeclarativeBase):
+    """Base class for all SQLAlchemy database models."""
+
+
+settings = get_settings()
+
+connect_args = (
+    {"check_same_thread": False}
+    if settings.database_url.startswith("sqlite")
+    else {}
+)
+
+engine = create_engine(
+    settings.database_url,
+    connect_args=connect_args,
+)
+
+SessionLocal = sessionmaker(
+    bind=engine,
+    autoflush=False,
+    expire_on_commit=False,
+)
+
+def get_database_session() -> Generator[Session, None, None]:
+    """Get a database session and always close it afterwards"""
+
+    with SessionLocal() as session:
+        yield session
+
+
+def create_database_tables() -> None:
+    """Create every registered database table"""
+
+    from app.models.analysis_record import AnalysisRecord
+
+    Base.metadata.create_all(bind=engine)

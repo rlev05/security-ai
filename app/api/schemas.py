@@ -24,9 +24,18 @@ class SecurityEventResponse(BaseModel):
 class AlertResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    rule_id: str
     title: str
     description: str
     severity: Severity
+    confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+    )
+    mitre_tactic: str
+    mitre_technique_id: str
+    mitre_technique_name: str
+    evidence: list[str]
 
 
 class IncidentResponse(BaseModel):
