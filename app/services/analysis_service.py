@@ -1,5 +1,6 @@
 from app.detection.auth_log_parser import parse_auth_log_line
 from app.detection.brute_force_detector import detect_brute_force
+from app.detection.credential_compromise_detector import detect_success_after_failures
 from app.detection.password_spray_detector import (detect_password_spraying,)
 from app.models.analysis import AnalysisResult
 from app.models.event import SecurityEvent
@@ -34,6 +35,7 @@ def analyse_auth_log(
     incidents = [
         *detect_brute_force(events),
         *detect_password_spraying(events),
+        *detect_success_after_failures(events),
     ]
 
     return AnalysisResult(

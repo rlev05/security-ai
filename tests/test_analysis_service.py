@@ -64,3 +64,27 @@ def test_rejects_empty_content() -> None:
     ):
         analyse_auth_log("  ")
 
+
+def test_correlates_success_after_failed_logins() -> None:
+    content = """
+    2026-08-01T12:00:00 Failed password for admin from 192.168.1.5
+    2026-08-01T12:01:00 Failed password for admin from 192.168.1.5
+    2026-08-01T12:02:00 Failed password for admin from 192.168.1.5
+    2026-08-01T12:03:00 Failed password for admin from 192.168.1.5
+    2026-08-01T12:04:00 Failed password for admin from 192.168.1.5
+    2026-08-01T12:05:00 Accepted password for admin from 192.168.1.5
+    """
+
+    result = analyse_auth_log(content)
+
+    rule_ids = {
+        incident.alerts[0].rule_id
+        for incident in result.incidents
+    }
+
+    assert len(result.events) == 6
+    assert "AUTH-BRUTE-FORCE-001" in rule_ids
+    assert (
+        "AUTH-SUCCESS-AFTER-FAILURES-001"
+        in rule_ids
+    )
