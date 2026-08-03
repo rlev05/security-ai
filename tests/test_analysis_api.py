@@ -1,11 +1,10 @@
 from fastapi.testclient import TestClient
-from mypy.solve import check_linear
-
 from app.main import app
 
-client = TestClient(app)
 
-def test_analysis_endpoint_detects_brute_force() -> None:
+def test_analysis_endpoint_detects_brute_force(
+        client: TestClient,
+) -> None:
     content = """
        2026-08-01T12:00:00 Failed password for admin from 192.168.1.5
        2026-08-01T12:01:00 Failed password for admin from 192.168.1.5
@@ -29,7 +28,9 @@ def test_analysis_endpoint_detects_brute_force() -> None:
     assert len(body["incidents"]) == 1
     assert body["incidents"][0]["alerts"][0]["severity"] =="high"
 
-def test_analysis_endpoint_rejects_empty_content() -> None:
+def test_analysis_endpoint_rejects_empty_content(
+        client: TestClient,
+) -> None:
     response = client.post(
         "/analysis/auth-log",
         json={"content": "  "},
@@ -37,7 +38,9 @@ def test_analysis_endpoint_rejects_empty_content() -> None:
 
     assert response.status_code == 422
 
-def test_file_upload_endpoint_detects_brute_force() -> None:
+def test_file_upload_endpoint_detects_brute_force(
+        client: TestClient,
+) -> None:
     content = """
     2026-08-01T12:00:00 Failed password for admin from 192.168.1.5
     2026-08-01T12:01:00 Failed password for admin from 192.168.1.5
@@ -67,7 +70,9 @@ def test_file_upload_endpoint_detects_brute_force() -> None:
     assert len(body["incidents"]) == 1
     assert body["incidents"][0]["alerts"][0]["severity"] =="high"
 
-def test_file_upload_rejects_invalid_encoding() -> None:
+def test_file_upload_rejects_invalid_encoding(
+        client: TestClient
+) -> None:
     response = client.post(
         "/analysis/auth-log/file",
         files={
@@ -84,7 +89,9 @@ def test_file_upload_rejects_invalid_encoding() -> None:
         "Uploaded file must contain valid UTF-8 text."
     )
 
-def test_file_upload_rejects_oversized_file() -> None:
+def test_file_upload_rejects_oversized_file(
+        client: TestClient,
+) -> None:
     response = client.post(
         "/analysis/auth-log/file",
         files={
@@ -99,4 +106,23 @@ def test_file_upload_rejects_oversized_file() -> None:
     assert response.status_code == 413
     assert response.json()["detail"] == (
         "Uploaded file must not exceed 1 MB."
+    )
+
+def test_file_upload_rejects_unsupported_extension(
+        client: TestClient,
+) -> None:
+    response = client.post(
+        "analysis/auth-log/file",
+        files={
+            "file": (
+                "auth.csv",
+                b"test content",
+                "text/csv"
+            ),
+        },
+    )
+
+    assert response.status_code == 415
+    assert response.json()["detail"] == (
+        "Only .log and .txt files are supported."
     )

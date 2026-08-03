@@ -1,8 +1,8 @@
 from datetime import datetime
+from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from app.models.alert import Severity
-from app.models.event import EventType, SecurityEvent
-
+from app.models.event import EventType
 
 class LogAnalysisRequest(BaseModel):
     content: str = Field(
@@ -52,3 +52,28 @@ class AnalysisResponse(BaseModel):
     ignored_lines: int
     events: list[SecurityEventResponse]
     incidents: list[IncidentResponse]
+
+class AnalysisSubmissionResponse(AnalysisResponse):
+    analysis_id: str
+    created_at: datetime
+    source_type: Literal["text", "file"]
+    source_name: str | None
+
+class AnalysisHistorySummaryResponse(BaseModel):
+    analysis_id: str
+    created_at: datetime
+    source_type: Literal["text", "file"]
+    source_name: str | None
+    total_lines: int
+    ignored_lines: int
+    event_count: int
+    incident_count: int
+
+class AnalysisHistoryResponse(
+    AnalysisHistorySummaryResponse
+):
+    result: AnalysisResponse
+
+
+
+
