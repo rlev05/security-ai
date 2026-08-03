@@ -13,8 +13,9 @@ pydantic-settings
 python-dotenv
 
 # Authentication & Security
-python-jose[cryptography]
-passlib[argon2]
+PyJWT
+pwdlib[argon2]
+email-validator
 python-multipart
 
 # AI
