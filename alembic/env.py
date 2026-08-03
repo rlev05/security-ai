@@ -4,6 +4,7 @@ from sqlalchemy import engine_from_config, pool
 from app.core.config import get_settings
 from app.core.database import Base
 from app.models.analysis_record import AnalysisRecord
+from app.models.user_record import UserRecord
 
 config = context.config
 
