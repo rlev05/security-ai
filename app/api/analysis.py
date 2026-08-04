@@ -23,6 +23,7 @@ from app.api.schemas import (
 from app.core.database import get_database_session
 from app.models.analysis import AnalysisResult
 from app.models.analysis_record import AnalysisRecord
+from app.models.user import UserRole
 from app.models.user_record import UserRecord
 from app.services.analysis_history_service import (
     get_analysis_record,
@@ -105,6 +106,17 @@ def create_history_summary(
         event_count=record.event_count,
         incident_count=record.incident_count,
     )
+
+
+def get_analysis_owner_filter(
+    current_user: UserRecord,
+) -> str | None:
+    """Return the owner filter appropriate for the user's role."""
+
+    if current_user.role == UserRole.ADMIN.value:
+        return None
+
+    return current_user.id
 
 
 @router.post(
@@ -201,6 +213,7 @@ async def analyse_authentication_log_file(
 )
 def get_analysis_history(
     session: DatabaseSession,
+    current_user: CurrentUser,
     limit: Annotated[
         int,
         Query(
@@ -215,12 +228,15 @@ def get_analysis_history(
         ),
     ] = 0,
 ) -> list[AnalysisHistorySummaryResponse]:
-    """Return persisted analyses from newest to oldest."""
+    """Return analyses visible to the authenticated user."""
 
     records = list_analysis_records(
         session,
         limit=limit,
         offset=offset,
+        owner_user_id=get_analysis_owner_filter(
+            current_user
+        ),
     )
 
     return [
@@ -237,12 +253,16 @@ def get_analysis_history(
 def get_analysis_history_record(
     analysis_id: str,
     session: DatabaseSession,
+    current_user: CurrentUser,
 ) -> AnalysisHistoryResponse:
-    """Return one complete persisted analysis."""
+    """Return one analysis visible to the authenticated user."""
 
     record = get_analysis_record(
         session,
         analysis_id,
+        owner_user_id=get_analysis_owner_filter(
+            current_user
+        ),
     )
 
     if record is None:
