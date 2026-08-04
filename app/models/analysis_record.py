@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
-from sqlalchemy import DateTime, Integer, JSON, String
+from sqlalchemy import DateTime, Integer, JSON, String, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 
@@ -26,6 +26,16 @@ class AnalysisRecord(Base):
         String(36),
         primary_key=True,
         default=generate_uuid,
+    )
+
+    owner_user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey(
+            "users.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(
