@@ -103,7 +103,7 @@ def authenticate_user(
 
     user = get_user_by_login(session, login)
 
-    if user in None:
+    if user is None:
         return None
 
     if not user.is_active:

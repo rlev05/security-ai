@@ -7,6 +7,7 @@ from sqlalchemy.pool import StaticPool
 from app.core.database import Base, get_database_session
 from app.main import app
 from app.models.analysis_record import AnalysisRecord
+from app.models.user_record import UserRecord
 
 @pytest.fixture
 def client() -> Iterator[TestClient]:
