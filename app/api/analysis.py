@@ -12,6 +12,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
+from app.api.auth_dependencies import get_current_user
 from app.api.schemas import (
     AnalysisHistoryResponse,
     AnalysisHistorySummaryResponse,
@@ -22,6 +23,7 @@ from app.api.schemas import (
 from app.core.database import get_database_session
 from app.models.analysis import AnalysisResult
 from app.models.analysis_record import AnalysisRecord
+from app.models.user_record import UserRecord
 from app.services.analysis_history_service import (
     get_analysis_record,
     list_analysis_records,
@@ -43,6 +45,22 @@ ALLOWED_FILE_SUFFIXES = {
 }
 
 
+DatabaseSession = Annotated[
+    Session,
+    Depends(get_database_session),
+]
+
+CurrentUser = Annotated[
+    UserRecord,
+    Depends(get_current_user),
+]
+
+UploadedLogFile = Annotated[
+    UploadFile,
+    File(),
+]
+
+
 def run_analysis(content: str) -> AnalysisResult:
     """Run log analysis and translate domain errors into API errors."""
 
@@ -61,9 +79,7 @@ def create_submission_response(
 ) -> AnalysisSubmissionResponse:
     """Combine analysis output with persistence metadata."""
 
-    analysis_response = AnalysisResponse.model_validate(
-        result
-    )
+    analysis_response = AnalysisResponse.model_validate(result)
 
     return AnalysisSubmissionResponse(
         **analysis_response.model_dump(),
@@ -98,10 +114,8 @@ def create_history_summary(
 )
 def analyse_authentication_log(
     request: LogAnalysisRequest,
-    session: Annotated[
-        Session,
-        Depends(get_database_session),
-    ],
+    session: DatabaseSession,
+    current_user: CurrentUser,
 ) -> AnalysisSubmissionResponse:
     """Analyse submitted authentication-log text and persist it."""
 
@@ -111,6 +125,7 @@ def analyse_authentication_log(
         session,
         result,
         source_type="text",
+        owner_user_id=current_user.id,
     )
 
     return create_submission_response(
@@ -125,14 +140,9 @@ def analyse_authentication_log(
     status_code=status.HTTP_200_OK,
 )
 async def analyse_authentication_log_file(
-    file: Annotated[
-        UploadFile,
-        File(),
-    ],
-    session: Annotated[
-        Session,
-        Depends(get_database_session),
-    ],
+    file: UploadedLogFile,
+    session: DatabaseSession,
+    current_user: CurrentUser,
 ) -> AnalysisSubmissionResponse:
     """Analyse an uploaded authentication-log file and persist it."""
 
@@ -142,12 +152,8 @@ async def analyse_authentication_log_file(
     try:
         if file_suffix not in ALLOWED_FILE_SUFFIXES:
             raise HTTPException(
-                status_code=(
-                    status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
-                ),
-                detail=(
-                    "Only .log and .txt files are supported."
-                ),
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail="Only .log and .txt files are supported.",
             )
 
         file_bytes = await file.read(
@@ -157,18 +163,14 @@ async def analyse_authentication_log_file(
         if len(file_bytes) > MAX_UPLOAD_BYTES:
             raise HTTPException(
                 status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                detail=(
-                    "Uploaded file must not exceed 1 MB."
-                ),
+                detail="Uploaded file must not exceed 1 MB.",
             )
 
         try:
             content = file_bytes.decode("utf-8")
         except UnicodeDecodeError as error:
             raise HTTPException(
-                status_code=(
-                    status.HTTP_422_UNPROCESSABLE_CONTENT
-                ),
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=(
                     "Uploaded file must contain valid UTF-8 text."
                 ),
@@ -181,6 +183,7 @@ async def analyse_authentication_log_file(
             result,
             source_type="file",
             source_name=filename,
+            owner_user_id=current_user.id,
         )
 
         return create_submission_response(
@@ -197,10 +200,7 @@ async def analyse_authentication_log_file(
     status_code=status.HTTP_200_OK,
 )
 def get_analysis_history(
-    session: Annotated[
-        Session,
-        Depends(get_database_session),
-    ],
+    session: DatabaseSession,
     limit: Annotated[
         int,
         Query(
@@ -236,10 +236,7 @@ def get_analysis_history(
 )
 def get_analysis_history_record(
     analysis_id: str,
-    session: Annotated[
-        Session,
-        Depends(get_database_session),
-    ],
+    session: DatabaseSession,
 ) -> AnalysisHistoryResponse:
     """Return one complete persisted analysis."""
 

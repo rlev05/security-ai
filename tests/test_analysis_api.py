@@ -3,7 +3,7 @@ from app.main import app
 
 
 def test_analysis_endpoint_detects_brute_force(
-        client: TestClient,
+        analysis_client: TestClient,
 ) -> None:
     content = """
        2026-08-01T12:00:00 Failed password for admin from 192.168.1.5
@@ -13,7 +13,7 @@ def test_analysis_endpoint_detects_brute_force(
        2026-08-01T12:04:00 Failed password for admin from 192.168.1.5
        """
 
-    response = client.post(
+    response = analysis_client.post(
         "/analysis/auth-log",
         json={"content": content},
     )
@@ -29,9 +29,9 @@ def test_analysis_endpoint_detects_brute_force(
     assert body["incidents"][0]["alerts"][0]["severity"] =="high"
 
 def test_analysis_endpoint_rejects_empty_content(
-        client: TestClient,
+        analysis_client: TestClient,
 ) -> None:
-    response = client.post(
+    response = analysis_client.post(
         "/analysis/auth-log",
         json={"content": "  "},
     )
@@ -39,7 +39,7 @@ def test_analysis_endpoint_rejects_empty_content(
     assert response.status_code == 422
 
 def test_file_upload_endpoint_detects_brute_force(
-        client: TestClient,
+        analysis_client: TestClient,
 ) -> None:
     content = """
     2026-08-01T12:00:00 Failed password for admin from 192.168.1.5
@@ -49,7 +49,7 @@ def test_file_upload_endpoint_detects_brute_force(
     2026-08-01T12:04:00 Failed password for admin from 192.168.1.5
     """
 
-    response = client.post(
+    response = analysis_client.post(
         "/analysis/auth-log/file",
         files={
             "file": (
@@ -71,9 +71,9 @@ def test_file_upload_endpoint_detects_brute_force(
     assert body["incidents"][0]["alerts"][0]["severity"] =="high"
 
 def test_file_upload_rejects_invalid_encoding(
-        client: TestClient
+        analysis_client: TestClient
 ) -> None:
-    response = client.post(
+    response = analysis_client.post(
         "/analysis/auth-log/file",
         files={
             "file": (
@@ -90,9 +90,9 @@ def test_file_upload_rejects_invalid_encoding(
     )
 
 def test_file_upload_rejects_oversized_file(
-        client: TestClient,
+        analysis_client: TestClient,
 ) -> None:
-    response = client.post(
+    response = analysis_client.post(
         "/analysis/auth-log/file",
         files={
             "file": (
@@ -109,9 +109,9 @@ def test_file_upload_rejects_oversized_file(
     )
 
 def test_file_upload_rejects_unsupported_extension(
-        client: TestClient,
+        analysis_client: TestClient,
 ) -> None:
-    response = client.post(
+    response = analysis_client.post(
         "analysis/auth-log/file",
         files={
             "file": (

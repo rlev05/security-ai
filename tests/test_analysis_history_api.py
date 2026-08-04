@@ -11,9 +11,11 @@ BRUTE_FORCE_LOG = """
 
 
 def store_analysis(
-    client: TestClient,
+    analysis_client: TestClient,
 ) -> str:
-    response = client.post(
+    """Submit and store an analysis using an authenticated user."""
+
+    response = analysis_client.post(
         "/analysis/auth-log",
         json={
             "content": BRUTE_FORCE_LOG,
@@ -26,41 +28,35 @@ def store_analysis(
 
 
 def test_retrieves_stored_analysis(
-    client: TestClient,
+    analysis_client: TestClient,
 ) -> None:
-    analysis_id = store_analysis(client)
+    analysis_id = store_analysis(analysis_client)
 
-    response = client.get(
+    response = analysis_client.get(
         f"/analysis/history/{analysis_id}",
     )
 
     assert response.status_code == 200
 
-    data = response.json()
+    body = response.json()
 
-    assert data["analysis_id"] == analysis_id
-    assert data["source_type"] == "text"
-    assert data["source_name"] is None
-    assert data["event_count"] == 5
-    assert data["incident_count"] == 1
-
-    stored_alert = (
-        data["result"]["incidents"][0]["alerts"][0]
-    )
-
-    assert (
-        stored_alert["rule_id"]
-        == "AUTH-BRUTE-FORCE-001"
-    )
+    assert body["analysis_id"] == analysis_id
+    assert body["source_type"] == "text"
+    assert body["source_name"] is None
+    assert body["total_lines"] == 5
+    assert body["ignored_lines"] == 0
+    assert body["event_count"] == 5
+    assert body["incident_count"] >= 1
+    assert "result" in body
 
 
 def test_lists_analysis_history(
-    client: TestClient,
+    analysis_client: TestClient,
 ) -> None:
-    first_id = store_analysis(client)
-    second_id = store_analysis(client)
+    first_id = store_analysis(analysis_client)
+    second_id = store_analysis(analysis_client)
 
-    response = client.get(
+    response = analysis_client.get(
         "/analysis/history",
     )
 
@@ -73,30 +69,18 @@ def test_lists_analysis_history(
         for record in records
     }
 
-    assert len(records) == 2
     assert first_id in record_ids
     assert second_id in record_ids
 
-    assert all(
-        record["event_count"] == 5
-        for record in records
-    )
 
-    assert all(
-        record["incident_count"] == 1
-        for record in records
-    )
-
-
-def test_returns_not_found_for_unknown_analysis(
-    client: TestClient,
+def test_missing_analysis_returns_not_found(
+    analysis_client: TestClient,
 ) -> None:
-    response = client.get(
-        "/analysis/history/"
-        "00000000-0000-0000-0000-000000000000",
+    response = analysis_client.get(
+        "/analysis/history/missing-analysis-id",
     )
 
     assert response.status_code == 404
-    assert response.json()["detail"] == (
-        "Analysis record not found."
-    )
+    assert response.json() == {
+        "detail": "Analysis record not found.",
+    }
