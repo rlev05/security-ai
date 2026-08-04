@@ -5,6 +5,8 @@ from app.core.config import get_settings
 from app.core.database import Base
 from app.models.analysis_record import AnalysisRecord
 from app.models.user_record import UserRecord
+from app.models.investigation_report_record import InvestigationReportRecord
+
 
 config = context.config
 

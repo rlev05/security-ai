@@ -9,6 +9,7 @@ from app.main import app
 from app.models.analysis_record import AnalysisRecord
 from app.models.user_record import UserRecord
 import uuid
+from app.models.investigation_report_record import InvestigationReportRecord
 
 
 @pytest.fixture
