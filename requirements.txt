@@ -19,7 +19,7 @@ email-validator
 python-multipart
 
 # AI
-openai
+openai>=2.0
 ollama
 
 # HTTP Requests

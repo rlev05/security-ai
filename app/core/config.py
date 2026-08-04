@@ -1,8 +1,8 @@
 from functools import lru_cache
 from pathlib import Path
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
+from typing import Literal
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ENV_FILE = PROJECT_ROOT / ".env"
@@ -17,6 +17,22 @@ class Settings(BaseSettings):
         default=30,
         ge=5,
         le=1440,
+    )
+
+    ai_provider: Literal["disabled", "openai"] = "disabled"
+    openai_api_key: SecretStr | None = None
+    openai_model: str = "gpt-5-mini"
+
+    ai_request_timeout_seconds: float = Field(
+        default=30.0,
+        ge=5,
+        le=300
+    )
+
+    ai_max_input_characters: int = Field(
+        default=30_000,
+        ge=5_000,
+        le=200_000
     )
 
     model_config = SettingsConfigDict(
