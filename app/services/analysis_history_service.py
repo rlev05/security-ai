@@ -18,6 +18,7 @@ def save_analysis_result(
     *,
     source_type: str,
     source_name: str | None = None,
+    owner_user_id: str | None = None,
 ) -> AnalysisRecord:
     """Persist a completed analysis as an immutable snapshot."""
 
@@ -29,6 +30,7 @@ def save_analysis_result(
     response = AnalysisResponse.model_validate(result)
 
     record = AnalysisRecord(
+        owner_user_id=owner_user_id,
         source_type=source_type,
         source_name=source_name,
         total_lines=result.total_lines,
@@ -50,15 +52,24 @@ def save_analysis_result(
 
 
 def get_analysis_record(
-    session: Session,
-    analysis_id: str,
+        session: Session,
+        analysis_id: str,
+        *,
+        owner_user_id: str | None = None,
 ) -> AnalysisRecord | None:
-    """Retrieve a stored analysis by its public identifier."""
+    """Retrieve analysis record"""
 
-    return session.get(
-        AnalysisRecord,
-        analysis_id,
+    statement = select(AnalysisRecord).where(
+        AnalysisRecord.id == analysis_id
     )
+
+    if owner_user_id is not None:
+        statement = statement.where(
+            AnalysisRecord.owner_user_id == owner_user_id
+        )
+
+    return session.scalar(statement)
+
 
 
 def list_analysis_records(
@@ -66,22 +77,24 @@ def list_analysis_records(
     *,
     limit: int = 20,
     offset: int = 0,
+    owner_user_id: str | None = None,
 ) -> list[AnalysisRecord]:
     """Return stored analyses from newest to oldest."""
 
-    if limit < 1:
-        raise ValueError("Limit must be at least 1")
+    statement = select(AnalysisRecord)
 
-    if offset < 0:
-        raise ValueError("Offset cannot be negative")
+    if owner_user_id is not None:
+        statement = statement.where(
+            AnalysisRecord.owner_user_id == owner_user_id
+        )
 
     statement = (
-        select(AnalysisRecord)
+        statement
         .order_by(AnalysisRecord.created_at.desc())
         .offset(offset)
         .limit(limit)
     )
 
     return list(
-        session.scalars(statement)
+        session.scalars(statement).all()
     )
