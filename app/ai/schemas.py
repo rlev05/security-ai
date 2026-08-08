@@ -27,7 +27,7 @@ class KeyFinding(BaseModel):
     supporting_evidence: list[str]
     confidence: float = Field(ge=0.0, le=1.0)
 
-class MitreAssessmentO(BaseModel):
+class MitreAssessment(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     tactic: str
@@ -54,7 +54,7 @@ class InvestigationReportContent(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
 
     key_findings: list[KeyFinding]
-    mitre_assessments: list[MitreAssessmentO]
+    mitre_assessment: list[MitreAssessment]
     investigation_steps: list[InvestigationStep]
 
     containment_recommendations: list[str]

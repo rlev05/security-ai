@@ -178,5 +178,4 @@ def get_ai_investigation_report(
             detail="No investigation report exists for this analysis",
         )
 
-    return generate_investigation_report(record)
-
+    return build_report_response(record)
