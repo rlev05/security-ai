@@ -8,6 +8,11 @@ class InvestigationRiskLevel(StrEnum):
     HIGH = 'high'
     CRITICAL = 'critical'
 
+class EvidenceBasis(StrEnum):
+    OBSERVED_EVIDENCE = "observed_evidence"
+    DETECTION_ENGINE = "detection_engine"
+    ATTACK_KNOWLEDGE = "attack_knowledge"
+    AI_INFERENCE = "ai_inference"
 
 class AnalysisEvidence(BaseModel):
     """Evidence supplied to an AI provider"""
@@ -26,6 +31,19 @@ class KeyFinding(BaseModel):
     finding: str
     supporting_evidence: list[str]
     confidence: float = Field(ge=0.0, le=1.0)
+
+class EvidenceAssessment(BaseModel):
+    """A claim explicitly labelled by its source/basis"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    basis: EvidenceBasis
+    statement: str
+
+    technique_ids: list[str] = Field(default_factory=list)
+
+
+
 
 class MitreAssessment(BaseModel):
     model_config = ConfigDict(extra="forbid")
