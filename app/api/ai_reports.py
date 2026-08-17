@@ -20,6 +20,9 @@ from app.api.ai_report_schemas import (
 )
 from app.api.auth_dependencies import get_current_user
 from app.core.database import get_database_session
+from app.knowledge.attack_repository import AttackKnowledgeRepository
+from app.knowledge.dependencies import get_attack_repository
+from app.knowledge.schemas import AttackGroundingContext
 from app.models.investigation_report_record import (
     InvestigationReportRecord,
 )
@@ -55,6 +58,10 @@ AIProvider = Annotated[
     Depends(get_ai_provider),
 ]
 
+AttackRepository = Annotated[
+    AttackKnowledgeRepository,
+    Depends(get_attack_repository)
+]
 
 def get_owner_filter(
     current_user: UserRecord,
@@ -96,6 +103,13 @@ def build_report_response(
             record.report_json
         )
 
+    grounding = None
+
+    if record.grounding_json is not None:
+        grounding = (
+            AttackGroundingContext.model_validate(record.grounding_json)
+        )
+
     return InvestigationReportResponse(
         report_id=record.id,
         analysis_id=record.analysis_id,
@@ -104,6 +118,7 @@ def build_report_response(
         provider=record.provider,
         model=record.model,
         report=report,
+        grounding=grounding,
         error_message=record.error_message,
         created_at=record.created_at,
         completed_at=record.completed_at,
@@ -115,14 +130,20 @@ def build_report_response(
     response_model=InvestigationReportResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@router.post(
+    "/{analysis_id}/ai-report",
+    response_model=(
+        InvestigationReportResponse
+    ),
+    status_code=status.HTTP_201_CREATED,
+)
 def create_ai_investigation_report(
     analysis_id: str,
     session: DatabaseSession,
     current_user: CurrentUser,
     provider: AIProvider,
+    repository: AttackRepository,
 ) -> InvestigationReportResponse:
-    """Generate and persist an AI report for an accessible analysis."""
-
     analysis = get_visible_analysis(
         session,
         analysis_id=analysis_id,
@@ -133,17 +154,25 @@ def create_ai_investigation_report(
         record = generate_investigation_report(
             session,
             analysis=analysis,
-            requested_by_user_id=current_user.id,
+            requested_by_user_id=(
+                current_user.id
+            ),
             provider=provider,
+            repository=repository,
         )
     except AIProviderUnavailableError as exc:
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            status_code=(
+                status.HTTP_503_SERVICE_UNAVAILABLE
+            ),
             detail=str(exc),
         ) from exc
+
     except AIProviderResponseError as exc:
         raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
+            status_code=(
+                status.HTTP_502_BAD_GATEWAY
+            ),
             detail=str(exc),
         ) from exc
 
@@ -152,30 +181,37 @@ def create_ai_investigation_report(
 
 @router.get(
     "/{analysis_id}/ai-report",
-    response_model=InvestigationReportResponse,
+    response_model=(
+        InvestigationReportResponse
+    ),
 )
 def get_ai_investigation_report(
     analysis_id: str,
     session: DatabaseSession,
     current_user: CurrentUser,
 ) -> InvestigationReportResponse:
-    """Return the latest AI report attempt for an accessible analysis."""
-
     get_visible_analysis(
         session,
         analysis_id=analysis_id,
         current_user=current_user,
     )
 
-    record = get_latest_investigation_report(
-        session,
-        analysis_id=analysis_id,
+    record = (
+        get_latest_investigation_report(
+            session,
+            analysis_id=analysis_id,
+        )
     )
 
     if record is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No investigation report exists for this analysis",
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+            ),
+            detail=(
+                "No investigation report exists "
+                "for this analysis"
+            ),
         )
 
     return build_report_response(record)
