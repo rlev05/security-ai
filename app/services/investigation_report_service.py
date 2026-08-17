@@ -3,11 +3,14 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ai.grounding import validate_and_normalise_grounded_report
+
 from app.ai.provider import (
     AIProviderError,
     InvestigationReportProvider,
 )
 from app.ai.schemas import AnalysisEvidence
+from app.knowledge.attack_repository import AttackKnowledgeRepository
 from app.models.analysis_record import AnalysisRecord
 from app.models.investigation_report import (
     InvestigationReportStatus,
@@ -19,8 +22,15 @@ from app.models.investigation_report_record import (
 
 def build_analysis_evidence(
     analysis: AnalysisRecord,
+    repository: AttackKnowledgeRepository,
 ) -> AnalysisEvidence:
     """Convert a stored analysis into evidence for the AI provider."""
+
+    attack_context = (
+        repository.build_grounding_context(
+            analysis.result_json
+        )
+    )
 
     return AnalysisEvidence(
         analysis_id=analysis.id,
@@ -29,6 +39,7 @@ def build_analysis_evidence(
         total_lines=analysis.total_lines,
         ignored_lines=analysis.ignored_lines,
         result=analysis.result_json,
+        attack_context=attack_context
     )
 
 
@@ -67,6 +78,7 @@ def complete_report(
     provider_name: str,
     model_name: str,
     report_json: dict[str, object],
+    grounding_json: dict[str, object],
 ) -> InvestigationReportRecord:
     """Mark an investigation report as successfully completed."""
 
@@ -74,6 +86,7 @@ def complete_report(
     record.provider = provider_name
     record.model = model_name
     record.report_json = report_json
+    record.grounding_json = grounding_json
     record.error_message = None
     record.completed_at = datetime.now(timezone.utc)
 
@@ -115,23 +128,34 @@ def generate_investigation_report(
     analysis: AnalysisRecord,
     requested_by_user_id: str,
     provider: InvestigationReportProvider,
+    repository: AttackKnowledgeRepository,
 ) -> InvestigationReportRecord:
-    """Generate and persist one AI investigation report."""
+    """Generate a grounded AI investigation report."""
 
     record = create_pending_report(
         session,
         analysis_id=analysis.id,
-        requested_by_user_id=requested_by_user_id,
+        requested_by_user_id=(
+            requested_by_user_id
+        ),
         provider=provider,
     )
 
     evidence = build_analysis_evidence(
-        analysis
+        analysis,
+        repository,
     )
 
     try:
         generated = provider.generate_report(
             evidence
+        )
+
+        grounded_report = (
+            validate_and_normalise_grounded_report(
+                generated.content,
+                evidence.attack_context,
+            )
         )
     except AIProviderError as exc:
         fail_report(
@@ -139,6 +163,7 @@ def generate_investigation_report(
             record=record,
             error_message=str(exc),
         )
+
         raise
 
     return complete_report(
@@ -146,8 +171,15 @@ def generate_investigation_report(
         record=record,
         provider_name=generated.provider,
         model_name=generated.model,
-        report_json=generated.content.model_dump(
-            mode="json"
+        report_json=(
+            grounded_report.model_dump(
+                mode="json"
+            )
+        ),
+        grounding_json=(
+            evidence.attack_context.model_dump(
+                mode="json"
+            )
         ),
     )
 

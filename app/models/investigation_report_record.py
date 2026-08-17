@@ -60,6 +60,13 @@ class InvestigationReportRecord(Base):
         nullable=True,
     )
 
+    grounding_json: Mapped[
+        dict[str, Any] | None
+    ] = mapped_column(
+        JSON,
+        nullable=True,
+    )
+
     error_message: Mapped[str | None] = mapped_column(
         String(500),
         nullable=True,
