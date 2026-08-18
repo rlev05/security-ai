@@ -1,39 +1,50 @@
 from collections.abc import Iterator
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
+
 from app.core.database import Base, get_database_session
 from app.main import app
-from app.models.analysis_record import AnalysisRecord
-from app.models.user_record import UserRecord
-import uuid
-from app.models.investigation_report_record import InvestigationReportRecord
+
+# Import all SQLAlchemy models so they are registered with Base.metadata
+# before create_all() runs.
+from app.models.analysis_record import AnalysisRecord  # noqa: F401
+from app.models.investigation_report_record import (
+    InvestigationReportRecord,
+)  # noqa: F401
+from app.models.user_record import UserRecord  # noqa: F401
 
 
-@pytest.fixture
+TEST_ENGINE = create_engine(
+    "sqlite://",
+    connect_args={
+        "check_same_thread": False,
+    },
+    poolclass=StaticPool,
+)
+
+
+TestingSessionLocal = sessionmaker(
+    bind=TEST_ENGINE,
+    autoflush=False,
+    expire_on_commit=False,
+)
+
+
+@pytest.fixture()
 def client() -> Iterator[TestClient]:
-    engine = create_engine(
-        "sqlite://",
-        connect_args={
-            "check_same_thread": False,
-        },
-        poolclass=StaticPool,
+    """Return a TestClient backed by an isolated in-memory database."""
+
+    Base.metadata.create_all(
+        bind=TEST_ENGINE,
     )
 
-    Base.metadata.create_all(bind=engine)
-
-    testing_session = sessionmaker(
-        bind=engine,
-        autoflush=False,
-        expire_on_commit=False,
-    )
-
-    def override_database_session() -> (
-        Iterator[Session]
-    ):
-        with testing_session() as session:
+    def override_database_session() -> Iterator[Session]:
+        with TestingSessionLocal() as session:
             yield session
 
     app.dependency_overrides[
@@ -44,6 +55,7 @@ def client() -> Iterator[TestClient]:
 
     try:
         yield test_client
+
     finally:
         test_client.close()
 
@@ -52,21 +64,27 @@ def client() -> Iterator[TestClient]:
             None,
         )
 
-        Base.metadata.drop_all(bind=engine)
-        engine.dispose()
+        Base.metadata.drop_all(
+            bind=TEST_ENGINE,
+        )
+
 
 @pytest.fixture()
 def analysis_client(
-        client: TestClient,
+    client: TestClient,
 ) -> TestClient:
-    """Return a client authenticated as a analysis user"""
+    """Return a client authenticated as an analysis user."""
 
-    identifier = str(uuid.uuid4())
+    identifier = uuid.uuid4().hex
 
     registration_payload = {
-        "email": f"analysis_{identifier}@example.com",
-        "username": f"analysis_{identifier}",
-        "password": f"StrongPassword123!"
+        "email": (
+            f"analysis_{identifier}@example.com"
+        ),
+        "username": (
+            f"analysis_{identifier}"
+        ),
+        "password": "StrongPassword123!",
     }
 
     registration_response = client.post(
@@ -74,22 +92,55 @@ def analysis_client(
         json=registration_payload,
     )
 
-    assert registration_response.status_code == 201
+    assert (
+        registration_response.status_code
+        == 201
+    )
 
     token_response = client.post(
         "/auth/token",
         data={
-            "username": registration_payload["username"],
-            "password": registration_payload["password"],
+            "username": (
+                registration_payload["username"]
+            ),
+            "password": (
+                registration_payload["password"]
+            ),
         },
     )
 
     assert token_response.status_code == 200
 
-    access_token = token_response.json()["access_token"]
+    access_token = token_response.json()[
+        "access_token"
+    ]
 
-    client.headers.update({"Authorization": f"Bearer {access_token}"})
+    client.headers.update(
+        {
+            "Authorization": (
+                f"Bearer {access_token}"
+            )
+        }
+    )
 
     return client
 
 
+@pytest.fixture()
+def database_session(
+    client: TestClient,
+) -> Iterator[Session]:
+    """Return a database session using the same DB as the TestClient.
+
+    Depending on `client` ensures the test schema has already been
+    created and will be cleaned up after the test.
+    """
+
+    session = TestingSessionLocal()
+
+    try:
+        yield session
+
+    finally:
+        session.rollback()
+        session.close()
