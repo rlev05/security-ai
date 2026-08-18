@@ -5,12 +5,17 @@ from fastapi.testclient import TestClient
 
 from app.ai.dependencies import get_ai_provider
 from app.api.auth_dependencies import get_current_user
+from app.knowledge.dependencies import get_attack_repository
 from app.main import app
 from app.models.user import UserRole
 from app.models.user_record import UserRecord
 from tests.fake_ai_provider import (
     FakeInvestigationProvider,
+    HallucinatingInvestigationProvider,
     UnavailableInvestigationProvider,
+)
+from tests.fake_attack_knowledge import (
+    build_fake_attack_repository,
 )
 
 
@@ -23,13 +28,30 @@ AUTH_LOG_CONTENT = """
 """
 
 
+@pytest.fixture(autouse=True)
+def fake_attack_repository():
+    repository = build_fake_attack_repository()
+
+    app.dependency_overrides[
+        get_attack_repository
+    ] = lambda: repository
+
+    try:
+        yield repository
+    finally:
+        app.dependency_overrides.pop(
+            get_attack_repository,
+            None,
+        )
+
+
 @pytest.fixture()
 def fake_ai_provider() -> FakeInvestigationProvider:
     provider = FakeInvestigationProvider()
 
-    app.dependency_overrides[get_ai_provider] = (
-        lambda: provider
-    )
+    app.dependency_overrides[
+        get_ai_provider
+    ] = lambda: provider
 
     try:
         yield provider
@@ -70,13 +92,18 @@ def register_and_login(
 
     assert token_response.status_code == 200
 
+    access_token = token_response.json()[
+        "access_token"
+    ]
+
     headers = {
-        "Authorization": (
-            f"Bearer {token_response.json()['access_token']}"
-        ),
+        "Authorization": f"Bearer {access_token}",
     }
 
-    return registration_response.json(), headers
+    return (
+        registration_response.json(),
+        headers,
+    )
 
 
 def submit_analysis(
@@ -124,13 +151,43 @@ def test_user_can_generate_structured_ai_report(
     assert body["provider"] == "fake"
     assert body["model"] == "fake-investigator-v1"
 
-    assert body["report"]["risk_level"] == "high"
-    assert body["report"]["risk_score"] == 82
-    assert body["report"]["confidence"] == 0.94
+    assert body["report"] is not None
 
     assert (
-        body["report"]["mitre_assessment"][0]["technique_id"]
+        body["report"]["risk_level"]
+        == "high"
+    )
+
+    assert (
+        body["report"]["risk_score"]
+        == 82
+    )
+
+    assert (
+        body["report"]["confidence"]
+        == 0.94
+    )
+
+    assert (
+        body["report"][
+            "mitre_assessment"
+        ][0]["technique_id"]
         == "T1110.001"
+    )
+
+    assert body["grounding"] is not None
+
+    grounded_ids = {
+        technique["technique_id"]
+        for technique
+        in body["grounding"]["techniques"]
+    }
+
+    assert "T1110.001" in grounded_ids
+
+    assert (
+        body["grounding"]["attack_version"]
+        == "test"
     )
 
 
@@ -162,9 +219,17 @@ def test_generated_report_can_be_retrieved(
 
     assert retrieval_response.status_code == 200
 
+    creation_body = creation_response.json()
+    retrieval_body = retrieval_response.json()
+
     assert (
-        retrieval_response.json()["report_id"]
-        == creation_response.json()["report_id"]
+        retrieval_body["report_id"]
+        == creation_body["report_id"]
+    )
+
+    assert (
+        retrieval_body["grounding"]
+        == creation_body["grounding"]
     )
 
 
@@ -236,17 +301,25 @@ def test_admin_can_generate_report_for_any_analysis(
     )
 
     admin_user = UserRecord(
-        id=str(admin_response["id"]),
-        email=str(admin_response["email"]),
-        username=str(admin_response["username"]),
-        password_hash="not-used-by-this-test",
+        id=str(
+            admin_response["id"]
+        ),
+        email=str(
+            admin_response["email"]
+        ),
+        username=str(
+            admin_response["username"]
+        ),
+        password_hash=(
+            "not-used-by-this-test"
+        ),
         role=UserRole.ADMIN.value,
         is_active=True,
     )
 
-    app.dependency_overrides[get_current_user] = (
-        lambda: admin_user
-    )
+    app.dependency_overrides[
+        get_current_user
+    ] = lambda: admin_user
 
     try:
         response = client.post(
@@ -259,17 +332,23 @@ def test_admin_can_generate_report_for_any_analysis(
         )
 
     assert response.status_code == 201
-    assert response.json()["status"] == "completed"
+
+    body = response.json()
+
+    assert body["status"] == "completed"
+    assert body["grounding"] is not None
 
 
 def test_provider_failure_is_recorded(
     client: TestClient,
 ) -> None:
-    provider = UnavailableInvestigationProvider()
-
-    app.dependency_overrides[get_ai_provider] = (
-        lambda: provider
+    provider = (
+        UnavailableInvestigationProvider()
     )
+
+    app.dependency_overrides[
+        get_ai_provider
+    ] = lambda: provider
 
     try:
         _, headers = register_and_login(
@@ -287,7 +366,10 @@ def test_provider_failure_is_recorded(
             headers=headers,
         )
 
-        assert generation_response.status_code == 503
+        assert (
+            generation_response.status_code
+            == 503
+        )
 
         retrieval_response = client.get(
             f"/analysis/history/{analysis_id}/ai-report",
@@ -300,8 +382,11 @@ def test_provider_failure_is_recorded(
         )
 
     assert retrieval_response.status_code == 200
-    assert retrieval_response.json()["status"] == "failed"
-    assert retrieval_response.json()["report"] is None
+
+    body = retrieval_response.json()
+
+    assert body["status"] == "failed"
+    assert body["report"] is None
 
 
 def test_missing_report_returns_not_found(
@@ -324,3 +409,61 @@ def test_missing_report_returns_not_found(
     )
 
     assert response.status_code == 404
+
+
+def test_ai_cannot_reference_unretrieved_attack_technique(
+    client: TestClient,
+) -> None:
+    provider = (
+        HallucinatingInvestigationProvider()
+    )
+
+    app.dependency_overrides[
+        get_ai_provider
+    ] = lambda: provider
+
+    try:
+        _, headers = register_and_login(
+            client,
+            "grounding_attack",
+        )
+
+        analysis_id = submit_analysis(
+            client,
+            headers,
+        )
+
+        response = client.post(
+            (
+                f"/analysis/history/"
+                f"{analysis_id}/ai-report"
+            ),
+            headers=headers,
+        )
+
+        assert response.status_code == 502
+
+        saved_response = client.get(
+            (
+                f"/analysis/history/"
+                f"{analysis_id}/ai-report"
+            ),
+            headers=headers,
+        )
+    finally:
+        app.dependency_overrides.pop(
+            get_ai_provider,
+            None,
+        )
+
+    assert saved_response.status_code == 200
+
+    body = saved_response.json()
+
+    assert body["status"] == "failed"
+    assert body["report"] is None
+
+    assert (
+        "T1059"
+        in body["error_message"]
+    )
