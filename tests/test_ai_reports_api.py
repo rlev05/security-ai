@@ -3,20 +3,11 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from app.ai.dependencies import get_ai_provider
 from app.api.auth_dependencies import get_current_user
-from app.knowledge.dependencies import get_attack_repository
 from app.main import app
 from app.models.user import UserRole
 from app.models.user_record import UserRecord
-from tests.fake_ai_provider import (
-    FakeInvestigationProvider,
-    HallucinatingInvestigationProvider,
-    UnavailableInvestigationProvider,
-)
-from tests.fake_attack_knowledge import (
-    build_fake_attack_repository,
-)
+from app.tasks.dependencies import get_report_enqueuer
 
 
 AUTH_LOG_CONTENT = """
@@ -28,36 +19,26 @@ AUTH_LOG_CONTENT = """
 """
 
 
-@pytest.fixture(autouse=True)
-def fake_attack_repository():
-    repository = build_fake_attack_repository()
-
-    app.dependency_overrides[
-        get_attack_repository
-    ] = lambda: repository
-
-    try:
-        yield repository
-    finally:
-        app.dependency_overrides.pop(
-            get_attack_repository,
-            None,
-        )
-
-
 @pytest.fixture()
-def fake_ai_provider() -> FakeInvestigationProvider:
-    provider = FakeInvestigationProvider()
+def queued_report_ids() -> list[str]:
+    """Capture queued report IDs without contacting Redis."""
+
+    queued: list[str] = []
+
+    def fake_enqueue(
+        report_id: str,
+    ) -> None:
+        queued.append(report_id)
 
     app.dependency_overrides[
-        get_ai_provider
-    ] = lambda: provider
+        get_report_enqueuer
+    ] = lambda: fake_enqueue
 
     try:
-        yield provider
+        yield queued
     finally:
         app.dependency_overrides.pop(
-            get_ai_provider,
+            get_report_enqueuer,
             None,
         )
 
@@ -67,6 +48,7 @@ def register_and_login(
     prefix: str,
 ) -> tuple[dict[str, object], dict[str, str]]:
     suffix = uuid.uuid4().hex[:10]
+
     username = f"{prefix}_{suffix}"
 
     payload = {
@@ -123,13 +105,13 @@ def submit_analysis(
     return response.json()["analysis_id"]
 
 
-def test_user_can_generate_structured_ai_report(
+def test_user_can_queue_ai_report(
     client: TestClient,
-    fake_ai_provider: FakeInvestigationProvider,
+    queued_report_ids: list[str],
 ) -> None:
     _, headers = register_and_login(
         client,
-        "ai_report",
+        "ai_queue",
     )
 
     analysis_id = submit_analysis(
@@ -142,62 +124,32 @@ def test_user_can_generate_structured_ai_report(
         headers=headers,
     )
 
-    assert response.status_code == 201
+    assert response.status_code == 202
 
     body = response.json()
 
     assert body["analysis_id"] == analysis_id
-    assert body["status"] == "completed"
-    assert body["provider"] == "fake"
-    assert body["model"] == "fake-investigator-v1"
+    assert body["status"] == "pending"
 
-    assert body["report"] is not None
+    assert body["report"] is None
+    assert body["grounding"] is None
+    assert body["error_message"] is None
 
-    assert (
-        body["report"]["risk_level"]
-        == "high"
-    )
+    assert len(queued_report_ids) == 1
 
     assert (
-        body["report"]["risk_score"]
-        == 82
-    )
-
-    assert (
-        body["report"]["confidence"]
-        == 0.94
-    )
-
-    assert (
-        body["report"][
-            "mitre_assessment"
-        ][0]["technique_id"]
-        == "T1110.001"
-    )
-
-    assert body["grounding"] is not None
-
-    grounded_ids = {
-        technique["technique_id"]
-        for technique
-        in body["grounding"]["techniques"]
-    }
-
-    assert "T1110.001" in grounded_ids
-
-    assert (
-        body["grounding"]["attack_version"]
-        == "test"
+        queued_report_ids[0]
+        == body["report_id"]
     )
 
 
-def test_generated_report_can_be_retrieved(
+def test_pending_report_can_be_retrieved(
     client: TestClient,
-    fake_ai_provider: FakeInvestigationProvider,
+    queued_report_ids: list[str],
 ) -> None:
     _, headers = register_and_login(
         client,
-        "saved_report",
+        "pending_report",
     )
 
     analysis_id = submit_analysis(
@@ -210,7 +162,7 @@ def test_generated_report_can_be_retrieved(
         headers=headers,
     )
 
-    assert creation_response.status_code == 201
+    assert creation_response.status_code == 202
 
     retrieval_response = client.get(
         f"/analysis/history/{analysis_id}/ai-report",
@@ -227,15 +179,16 @@ def test_generated_report_can_be_retrieved(
         == creation_body["report_id"]
     )
 
-    assert (
-        retrieval_body["grounding"]
-        == creation_body["grounding"]
-    )
+    assert retrieval_body["status"] == "pending"
+    assert retrieval_body["report"] is None
+    assert retrieval_body["grounding"] is None
+
+    assert len(queued_report_ids) == 1
 
 
 def test_ai_report_requires_authentication(
     client: TestClient,
-    fake_ai_provider: FakeInvestigationProvider,
+    queued_report_ids: list[str],
 ) -> None:
     _, headers = register_and_login(
         client,
@@ -253,19 +206,21 @@ def test_ai_report_requires_authentication(
 
     assert response.status_code == 401
 
+    assert queued_report_ids == []
 
-def test_user_cannot_generate_report_for_another_user(
+
+def test_user_cannot_queue_report_for_another_user(
     client: TestClient,
-    fake_ai_provider: FakeInvestigationProvider,
+    queued_report_ids: list[str],
 ) -> None:
     _, owner_headers = register_and_login(
         client,
-        "ai_owner",
+        "queue_owner",
     )
 
     _, other_headers = register_and_login(
         client,
-        "ai_other",
+        "queue_other",
     )
 
     analysis_id = submit_analysis(
@@ -280,10 +235,12 @@ def test_user_cannot_generate_report_for_another_user(
 
     assert response.status_code == 404
 
+    assert queued_report_ids == []
 
-def test_admin_can_generate_report_for_any_analysis(
+
+def test_admin_can_queue_report_for_any_analysis(
     client: TestClient,
-    fake_ai_provider: FakeInvestigationProvider,
+    queued_report_ids: list[str],
 ) -> None:
     _, owner_headers = register_and_login(
         client,
@@ -331,67 +288,23 @@ def test_admin_can_generate_report_for_any_analysis(
             None,
         )
 
-    assert response.status_code == 201
+    assert response.status_code == 202
 
     body = response.json()
 
-    assert body["status"] == "completed"
-    assert body["grounding"] is not None
+    assert body["status"] == "pending"
 
+    assert len(queued_report_ids) == 1
 
-def test_provider_failure_is_recorded(
-    client: TestClient,
-) -> None:
-    provider = (
-        UnavailableInvestigationProvider()
+    assert (
+        queued_report_ids[0]
+        == body["report_id"]
     )
-
-    app.dependency_overrides[
-        get_ai_provider
-    ] = lambda: provider
-
-    try:
-        _, headers = register_and_login(
-            client,
-            "failed_report",
-        )
-
-        analysis_id = submit_analysis(
-            client,
-            headers,
-        )
-
-        generation_response = client.post(
-            f"/analysis/history/{analysis_id}/ai-report",
-            headers=headers,
-        )
-
-        assert (
-            generation_response.status_code
-            == 503
-        )
-
-        retrieval_response = client.get(
-            f"/analysis/history/{analysis_id}/ai-report",
-            headers=headers,
-        )
-    finally:
-        app.dependency_overrides.pop(
-            get_ai_provider,
-            None,
-        )
-
-    assert retrieval_response.status_code == 200
-
-    body = retrieval_response.json()
-
-    assert body["status"] == "failed"
-    assert body["report"] is None
 
 
 def test_missing_report_returns_not_found(
     client: TestClient,
-    fake_ai_provider: FakeInvestigationProvider,
+    queued_report_ids: list[str],
 ) -> None:
     _, headers = register_and_login(
         client,
@@ -410,22 +323,27 @@ def test_missing_report_returns_not_found(
 
     assert response.status_code == 404
 
+    assert queued_report_ids == []
 
-def test_ai_cannot_reference_unretrieved_attack_technique(
+
+def test_queue_failure_marks_report_failed(
     client: TestClient,
 ) -> None:
-    provider = (
-        HallucinatingInvestigationProvider()
-    )
+    def broken_enqueue(
+        report_id: str,
+    ) -> None:
+        raise RuntimeError(
+            "Redis unavailable"
+        )
 
     app.dependency_overrides[
-        get_ai_provider
-    ] = lambda: provider
+        get_report_enqueuer
+    ] = lambda: broken_enqueue
 
     try:
         _, headers = register_and_login(
             client,
-            "grounding_attack",
+            "queue_failure",
         )
 
         analysis_id = submit_analysis(
@@ -434,36 +352,78 @@ def test_ai_cannot_reference_unretrieved_attack_technique(
         )
 
         response = client.post(
-            (
-                f"/analysis/history/"
-                f"{analysis_id}/ai-report"
-            ),
+            f"/analysis/history/{analysis_id}/ai-report",
             headers=headers,
         )
 
-        assert response.status_code == 502
+        assert response.status_code == 503
 
-        saved_response = client.get(
-            (
-                f"/analysis/history/"
-                f"{analysis_id}/ai-report"
-            ),
+        assert response.json()["detail"] == (
+            "The background job queue is unavailable."
+        )
+
+        retrieval_response = client.get(
+            f"/analysis/history/{analysis_id}/ai-report",
             headers=headers,
         )
+
     finally:
         app.dependency_overrides.pop(
-            get_ai_provider,
+            get_report_enqueuer,
             None,
         )
 
-    assert saved_response.status_code == 200
+    assert retrieval_response.status_code == 200
 
-    body = saved_response.json()
+    body = retrieval_response.json()
 
     assert body["status"] == "failed"
     assert body["report"] is None
 
-    assert (
-        "T1059"
-        in body["error_message"]
+    assert body["error_message"] == (
+        "The investigation could not be queued "
+        "for background processing."
     )
+
+
+def test_multiple_requests_create_separate_jobs(
+    client: TestClient,
+    queued_report_ids: list[str],
+) -> None:
+    _, headers = register_and_login(
+        client,
+        "multiple_jobs",
+    )
+
+    analysis_id = submit_analysis(
+        client,
+        headers,
+    )
+
+    first_response = client.post(
+        f"/analysis/history/{analysis_id}/ai-report",
+        headers=headers,
+    )
+
+    second_response = client.post(
+        f"/analysis/history/{analysis_id}/ai-report",
+        headers=headers,
+    )
+
+    assert first_response.status_code == 202
+    assert second_response.status_code == 202
+
+    first_id = first_response.json()[
+        "report_id"
+    ]
+
+    second_id = second_response.json()[
+        "report_id"
+    ]
+
+    assert first_id != second_id
+
+    assert queued_report_ids == [
+        first_id,
+        second_id,
+    ]

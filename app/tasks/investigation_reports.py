@@ -11,7 +11,7 @@ from app.services.investigation_report_service import fail_report, process_inves
 logger = logging.getLogger(__name__)
 
 @celery_app.task(
-    name="security-ai.generate_investigation_report",
+    name="security_ai.generate_investigation_report",
 )
 def generate_investigation_report_task(
         report_id: str,
