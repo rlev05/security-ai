@@ -3,14 +3,17 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.ai.grounding import validate_and_normalise_grounded_report
-
+from app.ai.grounding import (
+    validate_and_normalise_grounded_report,
+)
 from app.ai.provider import (
     AIProviderError,
     InvestigationReportProvider,
 )
 from app.ai.schemas import AnalysisEvidence
-from app.knowledge.attack_repository import AttackKnowledgeRepository
+from app.knowledge.attack_repository import (
+    AttackKnowledgeRepository,
+)
 from app.models.analysis_record import AnalysisRecord
 from app.models.investigation_report import (
     InvestigationReportStatus,
@@ -24,7 +27,7 @@ def build_analysis_evidence(
     analysis: AnalysisRecord,
     repository: AttackKnowledgeRepository,
 ) -> AnalysisEvidence:
-    """Convert a stored analysis into evidence for the AI provider."""
+    """Build AI evidence with trusted ATT&CK grounding."""
 
     attack_context = (
         repository.build_grounding_context(
@@ -39,7 +42,7 @@ def build_analysis_evidence(
         total_lines=analysis.total_lines,
         ignored_lines=analysis.ignored_lines,
         result=analysis.result_json,
-        attack_context=attack_context
+        attack_context=attack_context,
     )
 
 
@@ -48,20 +51,38 @@ def create_pending_report(
     *,
     analysis_id: str,
     requested_by_user_id: str,
-    provider: InvestigationReportProvider,
 ) -> InvestigationReportRecord:
-    """Create a pending investigation-report record."""
+    """Create the database record before work is queued."""
 
     record = InvestigationReportRecord(
         analysis_id=analysis_id,
         requested_by_user_id=requested_by_user_id,
         status=InvestigationReportStatus.PENDING.value,
-        provider=provider.provider_name,
-        model=provider.model_name,
     )
 
     try:
         session.add(record)
+        session.commit()
+        session.refresh(record)
+    except Exception:
+        session.rollback()
+        raise
+
+    return record
+
+
+def set_report_provider(
+    session: Session,
+    *,
+    record: InvestigationReportRecord,
+    provider: InvestigationReportProvider,
+) -> InvestigationReportRecord:
+    """Record which provider and model will process the job."""
+
+    record.provider = provider.provider_name
+    record.model = provider.model_name
+
+    try:
         session.commit()
         session.refresh(record)
     except Exception:
@@ -80,15 +101,23 @@ def complete_report(
     report_json: dict[str, object],
     grounding_json: dict[str, object],
 ) -> InvestigationReportRecord:
-    """Mark an investigation report as successfully completed."""
+    """Mark a report as successfully completed."""
 
-    record.status = InvestigationReportStatus.COMPLETED.value
+    record.status = (
+        InvestigationReportStatus.COMPLETED.value
+    )
+
     record.provider = provider_name
     record.model = model_name
+
     record.report_json = report_json
     record.grounding_json = grounding_json
+
     record.error_message = None
-    record.completed_at = datetime.now(timezone.utc)
+
+    record.completed_at = datetime.now(
+        timezone.utc
+    )
 
     try:
         session.commit()
@@ -106,11 +135,19 @@ def fail_report(
     record: InvestigationReportRecord,
     error_message: str,
 ) -> InvestigationReportRecord:
-    """Mark an investigation-report attempt as failed."""
+    """Mark a report attempt as failed."""
 
-    record.status = InvestigationReportStatus.FAILED.value
-    record.error_message = error_message[:500]
-    record.completed_at = datetime.now(timezone.utc)
+    record.status = (
+        InvestigationReportStatus.FAILED.value
+    )
+
+    record.error_message = (
+        error_message[:500]
+    )
+
+    record.completed_at = datetime.now(
+        timezone.utc
+    )
 
     try:
         session.commit()
@@ -122,22 +159,51 @@ def fail_report(
     return record
 
 
-def generate_investigation_report(
+def process_investigation_report(
     session: Session,
     *,
-    analysis: AnalysisRecord,
-    requested_by_user_id: str,
+    report_id: str,
     provider: InvestigationReportProvider,
     repository: AttackKnowledgeRepository,
-) -> InvestigationReportRecord:
-    """Generate a grounded AI investigation report."""
+) -> InvestigationReportRecord | None:
+    """Process an already-created pending investigation report.
 
-    record = create_pending_report(
+    This function is intentionally independent of Celery so it can be
+    tested deterministically without starting Redis or a worker.
+    """
+
+    record = session.get(
+        InvestigationReportRecord,
+        report_id,
+    )
+
+    if record is None:
+        return None
+
+    if (
+        record.status
+        != InvestigationReportStatus.PENDING.value
+    ):
+        return record
+
+    analysis = session.get(
+        AnalysisRecord,
+        record.analysis_id,
+    )
+
+    if analysis is None:
+        return fail_report(
+            session,
+            record=record,
+            error_message=(
+                "The analysis associated with this "
+                "investigation report no longer exists."
+            ),
+        )
+
+    set_report_provider(
         session,
-        analysis_id=analysis.id,
-        requested_by_user_id=(
-            requested_by_user_id
-        ),
+        record=record,
         provider=provider,
     )
 
@@ -157,6 +223,7 @@ def generate_investigation_report(
                 evidence.attack_context,
             )
         )
+
     except AIProviderError as exc:
         fail_report(
             session,
@@ -164,7 +231,7 @@ def generate_investigation_report(
             error_message=str(exc),
         )
 
-        raise
+        return record
 
     return complete_report(
         session,
@@ -184,13 +251,22 @@ def generate_investigation_report(
     )
 
 
+def get_investigation_report(
+    session: Session,
+    *,
+    report_id: str,
+) -> InvestigationReportRecord | None:
+    return session.get(
+        InvestigationReportRecord,
+        report_id,
+    )
+
+
 def get_latest_investigation_report(
     session: Session,
     *,
     analysis_id: str,
 ) -> InvestigationReportRecord | None:
-    """Return the newest AI report attempt for an analysis."""
-
     statement = (
         select(InvestigationReportRecord)
         .where(
