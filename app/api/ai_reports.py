@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import (
@@ -8,21 +9,21 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-from app.ai.dependencies import get_ai_provider
-from app.ai.provider import (
-    AIProviderResponseError,
-    AIProviderUnavailableError,
-    InvestigationReportProvider,
+from app.ai.schemas import (
+    InvestigationReportContent,
 )
-from app.ai.schemas import InvestigationReportContent
 from app.api.ai_report_schemas import (
     InvestigationReportResponse,
 )
-from app.api.auth_dependencies import get_current_user
-from app.core.database import get_database_session
-from app.knowledge.attack_repository import AttackKnowledgeRepository
-from app.knowledge.dependencies import get_attack_repository
-from app.knowledge.schemas import AttackGroundingContext
+from app.api.auth_dependencies import (
+    get_current_user,
+)
+from app.core.database import (
+    get_database_session,
+)
+from app.knowledge.schemas import (
+    AttackGroundingContext,
+)
 from app.models.investigation_report_record import (
     InvestigationReportRecord,
 )
@@ -32,8 +33,12 @@ from app.services.analysis_history_service import (
     get_analysis_record,
 )
 from app.services.investigation_report_service import (
-    generate_investigation_report,
+    create_pending_report,
+    fail_report,
     get_latest_investigation_report,
+)
+from app.tasks.dependencies import (
+    get_report_enqueuer,
 )
 
 
@@ -53,20 +58,19 @@ CurrentUser = Annotated[
     Depends(get_current_user),
 ]
 
-AIProvider = Annotated[
-    InvestigationReportProvider,
-    Depends(get_ai_provider),
+ReportEnqueuer = Annotated[
+    Callable[[str], None],
+    Depends(get_report_enqueuer),
 ]
 
-AttackRepository = Annotated[
-    AttackKnowledgeRepository,
-    Depends(get_attack_repository)
-]
 
 def get_owner_filter(
     current_user: UserRecord,
 ) -> str | None:
-    if current_user.role == UserRole.ADMIN.value:
+    if (
+        current_user.role
+        == UserRole.ADMIN.value
+    ):
         return None
 
     return current_user.id
@@ -81,7 +85,9 @@ def get_visible_analysis(
     analysis = get_analysis_record(
         session,
         analysis_id,
-        owner_user_id=get_owner_filter(current_user),
+        owner_user_id=get_owner_filter(
+            current_user
+        ),
     )
 
     if analysis is None:
@@ -99,21 +105,29 @@ def build_report_response(
     report = None
 
     if record.report_json is not None:
-        report = InvestigationReportContent.model_validate(
-            record.report_json
+        report = (
+            InvestigationReportContent
+            .model_validate(
+                record.report_json
+            )
         )
 
     grounding = None
 
     if record.grounding_json is not None:
         grounding = (
-            AttackGroundingContext.model_validate(record.grounding_json)
+            AttackGroundingContext
+            .model_validate(
+                record.grounding_json
+            )
         )
 
     return InvestigationReportResponse(
         report_id=record.id,
         analysis_id=record.analysis_id,
-        requested_by_user_id=record.requested_by_user_id,
+        requested_by_user_id=(
+            record.requested_by_user_id
+        ),
         status=record.status,
         provider=record.provider,
         model=record.model,
@@ -128,52 +142,46 @@ def build_report_response(
 @router.post(
     "/{analysis_id}/ai-report",
     response_model=InvestigationReportResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-@router.post(
-    "/{analysis_id}/ai-report",
-    response_model=(
-        InvestigationReportResponse
-    ),
-    status_code=status.HTTP_201_CREATED,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 def create_ai_investigation_report(
     analysis_id: str,
     session: DatabaseSession,
     current_user: CurrentUser,
-    provider: AIProvider,
-    repository: AttackRepository,
+    enqueue_report: ReportEnqueuer,
 ) -> InvestigationReportResponse:
+    """Create and queue an asynchronous AI investigation."""
+
     analysis = get_visible_analysis(
         session,
         analysis_id=analysis_id,
         current_user=current_user,
     )
 
-    try:
-        record = generate_investigation_report(
-            session,
-            analysis=analysis,
-            requested_by_user_id=(
-                current_user.id
-            ),
-            provider=provider,
-            repository=repository,
-        )
-    except AIProviderUnavailableError as exc:
-        raise HTTPException(
-            status_code=(
-                status.HTTP_503_SERVICE_UNAVAILABLE
-            ),
-            detail=str(exc),
-        ) from exc
+    record = create_pending_report(
+        session,
+        analysis_id=analysis.id,
+        requested_by_user_id=current_user.id,
+    )
 
-    except AIProviderResponseError as exc:
-        raise HTTPException(
-            status_code=(
-                status.HTTP_502_BAD_GATEWAY
+    try:
+        enqueue_report(record.id)
+
+    except Exception as exc:
+        fail_report(
+            session,
+            record=record,
+            error_message=(
+                "The investigation could not be queued "
+                "for background processing."
             ),
-            detail=str(exc),
+        )
+
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "The background job queue is unavailable."
+            ),
         ) from exc
 
     return build_report_response(record)
@@ -181,33 +189,29 @@ def create_ai_investigation_report(
 
 @router.get(
     "/{analysis_id}/ai-report",
-    response_model=(
-        InvestigationReportResponse
-    ),
+    response_model=InvestigationReportResponse,
 )
 def get_ai_investigation_report(
     analysis_id: str,
     session: DatabaseSession,
     current_user: CurrentUser,
 ) -> InvestigationReportResponse:
+    """Return the latest investigation state."""
+
     get_visible_analysis(
         session,
         analysis_id=analysis_id,
         current_user=current_user,
     )
 
-    record = (
-        get_latest_investigation_report(
-            session,
-            analysis_id=analysis_id,
-        )
+    record = get_latest_investigation_report(
+        session,
+        analysis_id=analysis_id,
     )
 
     if record is None:
         raise HTTPException(
-            status_code=(
-                status.HTTP_404_NOT_FOUND
-            ),
+            status_code=status.HTTP_404_NOT_FOUND,
             detail=(
                 "No investigation report exists "
                 "for this analysis"
