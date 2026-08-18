@@ -39,3 +39,6 @@ mypy
 
 # Logging
 structlog
+
+
+celery[redis]>=5.6,<6

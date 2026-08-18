@@ -35,6 +35,8 @@ class Settings(BaseSettings):
         le=200_000
     )
 
+    celery_broker_url: str = "redis://redis:6379/0"
+
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
         env_file_encoding="utf-8",
