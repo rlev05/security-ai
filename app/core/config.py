@@ -43,6 +43,33 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    threat_intel_provider: Literal[
+        "disabled",
+        "abuseipdb",
+    ] = "disabled"
+
+    abuseipdb_api_key: SecretStr | None = None
+
+    abuseipdb_base_url: str = "https://api.abuseipdb.com/api/v2"
+
+    abuseipdb_max_age_days: int = Field(
+        default=90,
+        ge=1,
+        le=365,
+    )
+
+    threat_intel_timeout_seconds: float = Field(
+        default=10.0,
+        ge=1.0,
+        le=60.0,
+    )
+
+    threat_intel_cache_ttl_hours: int = Field(
+        default=24,
+        ge=1,
+        le=168,
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:
