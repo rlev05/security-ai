@@ -25,6 +25,25 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: security-ai-redis
+    restart: unless-stopped
+
+    ports:
+      - "6379:6379"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "ping",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build:
       context: .
@@ -35,19 +54,27 @@ services:
 
     environment:
       DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}"
+
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_ALGORITHM: ${JWT_ALGORITHM}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+
       AI_PROVIDER: ${AI_PROVIDER:-disabled}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
       AI_REQUEST_TIMEOUT_SECONDS: ${AI_REQUEST_TIMEOUT_SECONDS:-30}
       AI_MAX_INPUT_CHARACTERS: ${AI_MAX_INPUT_CHARACTERS:-30000}
+
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+
     ports:
       - "8000:8000"
 
     depends_on:
       database:
+        condition: service_healthy
+
+      redis:
         condition: service_healthy
 
     command:
@@ -69,6 +96,46 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: security-ai-worker
+    restart: unless-stopped
+
+    environment:
+      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}"
+
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+
+      AI_PROVIDER: ${AI_PROVIDER:-disabled}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
+      AI_REQUEST_TIMEOUT_SECONDS: ${AI_REQUEST_TIMEOUT_SECONDS:-30}
+      AI_MAX_INPUT_CHARACTERS: ${AI_MAX_INPUT_CHARACTERS:-30000}
+
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+
+    depends_on:
+      database:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+    command:
+      [
+        "celery",
+        "--app",
+        "app.core.celery_app:celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--concurrency=2",
+      ]
 
 
 volumes:
