@@ -6,7 +6,7 @@ from app.core.database import Base
 from app.models.analysis_record import AnalysisRecord
 from app.models.user_record import UserRecord
 from app.models.investigation_report_record import InvestigationReportRecord
-
+from app.models.threat_intel_record import ThreatIntelEnrichmentRecord
 
 config = context.config
 

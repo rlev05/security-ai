@@ -17,7 +17,7 @@ from app.models.investigation_report_record import (
     InvestigationReportRecord,
 )  # noqa: F401
 from app.models.user_record import UserRecord  # noqa: F401
-
+from app.models.threat_intel_record import ThreatIntelEnrichmentRecord
 
 TEST_ENGINE = create_engine(
     "sqlite://",
