@@ -1,16 +1,16 @@
 services:
   database:
     image: postgres:17-alpine
-    container_name: security-ai-postgres
+    container_name: security-ai-database
     restart: unless-stopped
 
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB:-security_ai}
+      POSTGRES_USER: ${POSTGRES_USER:-security_ai}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
 
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -19,11 +19,13 @@ services:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}",
+          "pg_isready -U ${POSTGRES_USER:-security_ai} -d ${POSTGRES_DB:-security_ai}"
         ]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 5s
+
 
   redis:
     image: redis:7-alpine
@@ -31,18 +33,20 @@ services:
     restart: unless-stopped
 
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
 
     healthcheck:
       test:
         [
           "CMD",
           "redis-cli",
-          "ping",
+          "ping"
         ]
       interval: 5s
-      timeout: 5s
+      timeout: 3s
       retries: 10
+      start_period: 5s
+
 
   api:
     build:
@@ -53,22 +57,32 @@ services:
     restart: unless-stopped
 
     environment:
-      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}"
+      APP_NAME: ${APP_NAME:-Security AI}
+
+      DATABASE_URL: >-
+        postgresql+psycopg://${POSTGRES_USER:-security_ai}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-security_ai}
 
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      JWT_ALGORITHM: ${JWT_ALGORITHM}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
 
       AI_PROVIDER: ${AI_PROVIDER:-disabled}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
       AI_REQUEST_TIMEOUT_SECONDS: ${AI_REQUEST_TIMEOUT_SECONDS:-30}
-      AI_MAX_INPUT_CHARACTERS: ${AI_MAX_INPUT_CHARACTERS:-30000}
+      AI_MAX_INPUT_CHARS: ${AI_MAX_INPUT_CHARS:-30000}
 
-      CELERY_BROKER_URL: "redis://redis:6379/0"
+      CELERY_BROKER_URL: redis://redis:6379/0
+
+      THREAT_INTEL_PROVIDER: ${THREAT_INTEL_PROVIDER:-disabled}
+      ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY:-}
+      ABUSEIPDB_BASE_URL: ${ABUSEIPDB_BASE_URL:-https://api.abuseipdb.com/api/v2}
+      ABUSEIPDB_MAX_AGE_DAYS: ${ABUSEIPDB_MAX_AGE_DAYS:-90}
+      THREAT_INTEL_TIMEOUT_SECONDS: ${THREAT_INTEL_TIMEOUT_SECONDS:-10}
+      THREAT_INTEL_CACHE_TTL_HOURS: ${THREAT_INTEL_CACHE_TTL_HOURS:-24}
 
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
 
     depends_on:
       database:
@@ -81,7 +95,7 @@ services:
       [
         "sh",
         "-c",
-        "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000",
+        "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
       ]
 
     healthcheck:
@@ -90,12 +104,13 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"
         ]
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 10s
+      start_period: 15s
+
 
   worker:
     build:
@@ -106,19 +121,29 @@ services:
     restart: unless-stopped
 
     environment:
-      DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}"
+      APP_NAME: ${APP_NAME:-Security AI}
+
+      DATABASE_URL: >-
+        postgresql+psycopg://${POSTGRES_USER:-security_ai}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-security_ai}
 
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      JWT_ALGORITHM: ${JWT_ALGORITHM}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
 
       AI_PROVIDER: ${AI_PROVIDER:-disabled}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
       AI_REQUEST_TIMEOUT_SECONDS: ${AI_REQUEST_TIMEOUT_SECONDS:-30}
-      AI_MAX_INPUT_CHARACTERS: ${AI_MAX_INPUT_CHARACTERS:-30000}
+      AI_MAX_INPUT_CHARS: ${AI_MAX_INPUT_CHARS:-30000}
 
-      CELERY_BROKER_URL: "redis://redis:6379/0"
+      CELERY_BROKER_URL: redis://redis:6379/0
+
+      THREAT_INTEL_PROVIDER: ${THREAT_INTEL_PROVIDER:-disabled}
+      ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY:-}
+      ABUSEIPDB_BASE_URL: ${ABUSEIPDB_BASE_URL:-https://api.abuseipdb.com/api/v2}
+      ABUSEIPDB_MAX_AGE_DAYS: ${ABUSEIPDB_MAX_AGE_DAYS:-90}
+      THREAT_INTEL_TIMEOUT_SECONDS: ${THREAT_INTEL_TIMEOUT_SECONDS:-10}
+      THREAT_INTEL_CACHE_TTL_HOURS: ${THREAT_INTEL_CACHE_TTL_HOURS:-24}
 
     depends_on:
       database:
@@ -134,7 +159,7 @@ services:
         "app.core.celery_app:celery_app",
         "worker",
         "--loglevel=INFO",
-        "--concurrency=2",
+        "--concurrency=2"
       ]
 
 
