@@ -22,10 +22,26 @@ from app.models.investigation_report_record import (
     InvestigationReportRecord,
 )
 
+from app.intel.provider import (
+    ThreatIntelProvider,
+)
+from app.intel.schemas import (
+    ThreatIntelContext,
+)
+from app.ioc.extractor import (
+    extract_indicators,
+)
+from app.services.threat_intel_service import (
+    enrich_indicators,
+)
+
 
 def build_analysis_evidence(
     analysis: AnalysisRecord,
     repository: AttackKnowledgeRepository,
+    threat_intel_context: (
+        ThreatIntelContext | None
+    ) = None
 ) -> AnalysisEvidence:
     """Build AI evidence with trusted ATT&CK grounding."""
 
@@ -35,6 +51,9 @@ def build_analysis_evidence(
         )
     )
 
+    if threat_intel_context is None:
+        threat_intel_context = ThreatIntelContext()
+
     return AnalysisEvidence(
         analysis_id=analysis.id,
         source_type=analysis.source_type,
@@ -43,6 +62,7 @@ def build_analysis_evidence(
         ignored_lines=analysis.ignored_lines,
         result=analysis.result_json,
         attack_context=attack_context,
+        threat_intel_context=threat_intel_context
     )
 
 
@@ -100,6 +120,7 @@ def complete_report(
     model_name: str,
     report_json: dict[str, object],
     grounding_json: dict[str, object],
+    threat_intel_json: dict[str, object],
 ) -> InvestigationReportRecord:
     """Mark a report as successfully completed."""
 
@@ -112,6 +133,7 @@ def complete_report(
 
     record.report_json = report_json
     record.grounding_json = grounding_json
+    record.threat_intel_json = threat_intel_json
 
     record.error_message = None
 
@@ -165,6 +187,8 @@ def process_investigation_report(
     report_id: str,
     provider: InvestigationReportProvider,
     repository: AttackKnowledgeRepository,
+    threat_intel_provider: (ThreatIntelProvider | None) = None,
+    threat_intel_cache_ttl_hours: int = 24,
 ) -> InvestigationReportRecord | None:
     """Process an already-created pending investigation report.
 
@@ -207,9 +231,24 @@ def process_investigation_report(
         provider=provider,
     )
 
+    threat_intel_context = ThreatIntelContext()
+
+    if threat_intel_provider is not None:
+        indicators = extract_indicators(analysis.result_json)
+
+        threat_intel_context = (
+            enrich_indicators(
+                session,
+                indicators=indicators,
+                provider=threat_intel_provider,
+                cache_ttl_hours=threat_intel_cache_ttl_hours,
+            )
+        )
+
     evidence = build_analysis_evidence(
         analysis,
         repository,
+        threat_intel_context,
     )
 
     try:
@@ -248,6 +287,10 @@ def process_investigation_report(
                 mode="json"
             )
         ),
+        threat_intel_json=(
+            evidence
+            .threat_intel_context.model_dump(mode="json")
+        )
     )
 
 

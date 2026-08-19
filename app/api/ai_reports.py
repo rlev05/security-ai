@@ -21,8 +21,14 @@ from app.api.auth_dependencies import (
 from app.core.database import (
     get_database_session,
 )
+from app.intel.schemas import (
+    ThreatIntelContext,
+)
 from app.knowledge.schemas import (
     AttackGroundingContext,
+)
+from app.models.analysis_record import (
+    AnalysisRecord,
 )
 from app.models.investigation_report_record import (
     InvestigationReportRecord,
@@ -53,10 +59,12 @@ DatabaseSession = Annotated[
     Depends(get_database_session),
 ]
 
+
 CurrentUser = Annotated[
     UserRecord,
     Depends(get_current_user),
 ]
+
 
 ReportEnqueuer = Annotated[
     Callable[[str], None],
@@ -67,6 +75,12 @@ ReportEnqueuer = Annotated[
 def get_owner_filter(
     current_user: UserRecord,
 ) -> str | None:
+    """Return the ownership filter for the current user.
+
+    Administrators can access all analyses. Normal users are restricted
+    to analyses that belong to their own account.
+    """
+
     if (
         current_user.role
         == UserRole.ADMIN.value
@@ -81,7 +95,9 @@ def get_visible_analysis(
     *,
     analysis_id: str,
     current_user: UserRecord,
-):
+) -> AnalysisRecord:
+    """Return an analysis the current user is permitted to access."""
+
     analysis = get_analysis_record(
         session,
         analysis_id,
@@ -92,7 +108,9 @@ def get_visible_analysis(
 
     if analysis is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+            ),
             detail="Analysis record not found",
         )
 
@@ -102,6 +120,8 @@ def get_visible_analysis(
 def build_report_response(
     record: InvestigationReportRecord,
 ) -> InvestigationReportResponse:
+    """Convert a persisted investigation report into an API response."""
+
     report = None
 
     if record.report_json is not None:
@@ -122,6 +142,19 @@ def build_report_response(
             )
         )
 
+    threat_intelligence = None
+
+    if (
+        record.threat_intel_json
+        is not None
+    ):
+        threat_intelligence = (
+            ThreatIntelContext
+            .model_validate(
+                record.threat_intel_json
+            )
+        )
+
     return InvestigationReportResponse(
         report_id=record.id,
         analysis_id=record.analysis_id,
@@ -133,6 +166,9 @@ def build_report_response(
         model=record.model,
         report=report,
         grounding=grounding,
+        threat_intelligence=(
+            threat_intelligence
+        ),
         error_message=record.error_message,
         created_at=record.created_at,
         completed_at=record.completed_at,
@@ -141,8 +177,12 @@ def build_report_response(
 
 @router.post(
     "/{analysis_id}/ai-report",
-    response_model=InvestigationReportResponse,
-    status_code=status.HTTP_202_ACCEPTED,
+    response_model=(
+        InvestigationReportResponse
+    ),
+    status_code=(
+        status.HTTP_202_ACCEPTED
+    ),
 )
 def create_ai_investigation_report(
     analysis_id: str,
@@ -150,7 +190,7 @@ def create_ai_investigation_report(
     current_user: CurrentUser,
     enqueue_report: ReportEnqueuer,
 ) -> InvestigationReportResponse:
-    """Create and queue an asynchronous AI investigation."""
+    """Create and queue an asynchronous AI investigation report."""
 
     analysis = get_visible_analysis(
         session,
@@ -161,42 +201,54 @@ def create_ai_investigation_report(
     record = create_pending_report(
         session,
         analysis_id=analysis.id,
-        requested_by_user_id=current_user.id,
+        requested_by_user_id=(
+            current_user.id
+        ),
     )
 
     try:
-        enqueue_report(record.id)
+        enqueue_report(
+            record.id
+        )
 
     except Exception as exc:
         fail_report(
             session,
             record=record,
             error_message=(
-                "The investigation could not be queued "
-                "for background processing."
+                "The investigation could not be "
+                "queued for background processing."
             ),
         )
 
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            status_code=(
+                status
+                .HTTP_503_SERVICE_UNAVAILABLE
+            ),
             detail=(
-                "The background job queue is unavailable."
+                "The background job queue "
+                "is unavailable."
             ),
         ) from exc
 
-    return build_report_response(record)
+    return build_report_response(
+        record
+    )
 
 
 @router.get(
     "/{analysis_id}/ai-report",
-    response_model=InvestigationReportResponse,
+    response_model=(
+        InvestigationReportResponse
+    ),
 )
 def get_ai_investigation_report(
     analysis_id: str,
     session: DatabaseSession,
     current_user: CurrentUser,
 ) -> InvestigationReportResponse:
-    """Return the latest investigation state."""
+    """Return the latest AI investigation report for an analysis."""
 
     get_visible_analysis(
         session,
@@ -204,18 +256,24 @@ def get_ai_investigation_report(
         current_user=current_user,
     )
 
-    record = get_latest_investigation_report(
-        session,
-        analysis_id=analysis_id,
+    record = (
+        get_latest_investigation_report(
+            session,
+            analysis_id=analysis_id,
+        )
     )
 
     if record is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+            ),
             detail=(
                 "No investigation report exists "
                 "for this analysis"
             ),
         )
 
-    return build_report_response(record)
+    return build_report_response(
+        record
+    )
