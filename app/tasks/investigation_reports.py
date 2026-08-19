@@ -6,7 +6,8 @@ from app.knowledge.dependencies import get_attack_repository
 from app.models.investigation_report import InvestigationReportStatus
 from app.models.investigation_report_record import InvestigationReportRecord
 from app.services.investigation_report_service import fail_report, process_investigation_report
-
+from app.core.config import get_settings
+from app.intel.dependencies import get_threat_intel_provider
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +48,16 @@ def generate_investigation_report_task(
         provider = get_ai_provider()
         repository = get_attack_repository()
 
+        threat_intel_provider = get_threat_intel_provider()
+        settings = get_settings()
+
         process_investigation_report(
             session,
             report_id=report_id,
             provider=provider,
             repository=repository,
+            threat_intel_provider=threat_intel_provider,
+            threat_intel_cache_ttl_hours=settings.threat_intel_cache_ttl_hours
         )
 
     except Exception:
