@@ -11,6 +11,9 @@ from app.knowledge.schemas import (
     AttackGroundingContext,
 )
 
+from app.intel.schemas import ThreatIntelContext
+from models.threat_intel_record import ThreatIntelEnrichmentRecord
+
 
 class InvestigationRiskLevel(StrEnum):
     LOW = "low"
@@ -23,6 +26,7 @@ class EvidenceBasis(StrEnum):
     OBSERVED_EVIDENCE = "observed_evidence"
     DETECTION_ENGINE = "detection_engine"
     ATTACK_KNOWLEDGE = "attack_knowledge"
+    THREAT_INTELLIGENCE = "threat_intelligence"
     AI_INFERENCE = "ai_inference"
 
 
@@ -39,6 +43,7 @@ class AnalysisEvidence(BaseModel):
     result: dict[str, Any]
 
     attack_context: AttackGroundingContext
+    threat_intel_context: ThreatIntelContext
 
 
 class KeyFinding(BaseModel):
