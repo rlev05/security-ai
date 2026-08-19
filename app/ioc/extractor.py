@@ -53,28 +53,37 @@ def normalise_ip(
 
 
 def add_indicator(
-        indicators: dict[
-            tuple[IndicatorType, str],
-            Indicator,
-        ],
-        *,
-        indicator_type: IndicatorType,
-        value: str,
+    indicators: dict[
+        tuple[IndicatorType, str],
+        Indicator,
+    ],
+    *,
+    indicator_type: IndicatorType,
+    value: str,
 ) -> None:
     normalised_value = value.strip()
 
     if indicator_type == IndicatorType.IP_ADDRESS:
-        parsed_ip = normalise_ip(normalised_value)
+        parsed_ip = normalise_ip(
+            normalised_value
+        )
+
         if parsed_ip is None:
             return
 
         normalised_value = parsed_ip
 
     elif indicator_type == IndicatorType.DOMAIN:
-        normalised_value = normalise_ip(normalised_value.rstrip(".").lower())
+        normalised_value = (
+            normalised_value
+            .rstrip(".")
+            .lower()
+        )
 
         try:
-            ipaddress.ip_address(normalised_value)
+            ipaddress.ip_address(
+                normalised_value
+            )
             return
         except ValueError:
             pass
@@ -93,6 +102,7 @@ def add_indicator(
         type=indicator_type,
         value=normalised_value,
     )
+
 
 def extract_from_text(
         text: str,

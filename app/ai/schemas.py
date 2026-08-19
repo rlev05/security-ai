@@ -12,8 +12,6 @@ from app.knowledge.schemas import (
 )
 
 from app.intel.schemas import ThreatIntelContext
-from models.threat_intel_record import ThreatIntelEnrichmentRecord
-
 
 class InvestigationRiskLevel(StrEnum):
     LOW = "low"
