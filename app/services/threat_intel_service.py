@@ -99,7 +99,7 @@ def save_enrichment(
     record.expires_at = now + timedelta(hours=cache_ttl_hours)
 
     try:
-        session.commit(1)
+        session.commit()
         session.refresh(record)
     except Exception:
         session.rollback()
