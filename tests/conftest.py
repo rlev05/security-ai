@@ -12,12 +12,13 @@ from app.main import app
 
 # Import all SQLAlchemy models so they are registered with Base.metadata
 # before create_all() runs.
-from app.models.analysis_record import AnalysisRecord  # noqa: F401
+from app.models.analysis_record import AnalysisRecord
 from app.models.investigation_report_record import (
     InvestigationReportRecord,
 )  # noqa: F401
-from app.models.user_record import UserRecord  # noqa: F401
+from app.models.user_record import UserRecord
 from app.models.threat_intel_record import ThreatIntelEnrichmentRecord
+from app.models.case_record import CaseRecord, CaseTimelineEventRecord, CaseNoteRecord, CaseAnalysisLink
 
 TEST_ENGINE = create_engine(
     "sqlite://",
