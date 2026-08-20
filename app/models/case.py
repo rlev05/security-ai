@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-class CaseSeverit(StrEnum):
+class CaseSeverity(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
