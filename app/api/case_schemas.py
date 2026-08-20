@@ -5,7 +5,7 @@ from app.models.case import CaseStatus, CaseSeverity
 
 class CaseCreateRequest(BaseModel):
     model_config = ConfigDict(
-        extra="forbid"
+        extra="forbid",
     )
 
     title: str = Field(
@@ -18,31 +18,36 @@ class CaseCreateRequest(BaseModel):
         max_length=10_000,
     )
 
-    severity: CaseSeverity = CaseSeverity.MEDIUM
-
-    assigned_to_user_id: str | None = None
-
-
-class CaseUpdateRequest(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid"
+    severity: CaseSeverity = (
+        CaseSeverity.MEDIUM
     )
 
     assigned_to_user_id: str | None = None
 
+
+class CaseAssignmentRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    assigned_to_user_id: str | None = None
+
+
 class CaseStatusUpdateRequest(BaseModel):
     model_config = ConfigDict(
-        extra="forbid"
+        extra="forbid",
     )
 
     status: CaseStatus
 
+
 class CaseSeverityUpdateRequest(BaseModel):
     model_config = ConfigDict(
-        extra="forbid"
+        extra="forbid",
     )
 
     severity: CaseSeverity
+
 
 class CaseAnalysisLinkRequest(BaseModel):
     model_config = ConfigDict(
@@ -153,4 +158,3 @@ class CaseDetailResponse(
     ] = Field(
         default_factory=list
     )
-

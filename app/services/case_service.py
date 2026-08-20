@@ -137,7 +137,7 @@ def list_cases(
     )
 
 
-def get_case_analysis_links(
+def get_case_analyses(
         session: Session,
         *,
         case_id: str,
