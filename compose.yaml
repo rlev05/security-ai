@@ -59,8 +59,11 @@ services:
     environment:
       APP_NAME: ${APP_NAME:-Security AI}
 
-      DATABASE_URL: >-
-        postgresql+psycopg://${POSTGRES_USER:-security_ai}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-security_ai}
+      POSTGRES_HOST: database
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
@@ -123,9 +126,11 @@ services:
     environment:
       APP_NAME: ${APP_NAME:-Security AI}
 
-      DATABASE_URL: >-
-        postgresql+psycopg://${POSTGRES_USER:-security_ai}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-security_ai}
-
+      POSTGRES_HOST: database
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
