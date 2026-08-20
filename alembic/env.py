@@ -8,6 +8,8 @@ from app.models.user_record import UserRecord
 from app.models.investigation_report_record import InvestigationReportRecord
 from app.models.threat_intel_record import ThreatIntelEnrichmentRecord
 from app.models.case_record import CaseAnalysisLink, CaseNoteRecord, CaseRecord, CaseTimelineEventRecord
+from app.models.anomaly_run_record import AnomalyRunRecord
+
 
 config = context.config
 
