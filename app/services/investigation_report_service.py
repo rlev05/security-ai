@@ -1,4 +1,6 @@
 from datetime import datetime, timezone
+from typing import Any
+
 from app.ai.schemas import AnalysisEvidence, AnomalyEvidenceContext
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -158,6 +160,7 @@ def complete_report(
     report_json: dict[str, object],
     grounding_json: dict[str, object],
     threat_intel_json: dict[str, object],
+    anomaly_json: dict[str, Any] | None,
 ) -> InvestigationReportRecord:
     """Mark a report as successfully completed."""
 
@@ -171,7 +174,7 @@ def complete_report(
     record.report_json = report_json
     record.grounding_json = grounding_json
     record.threat_intel_json = threat_intel_json
-
+    record.anomaly_json = anomaly_json
     record.error_message = None
 
     record.completed_at = datetime.now(
@@ -335,7 +338,11 @@ def process_investigation_report(
         threat_intel_json=(
             evidence
             .threat_intel_context.model_dump(mode="json")
-        )
+        ),
+        anomaly_json=(
+            evidence
+            .anomaly_context.model_dump(mode="json")
+        ),
     )
 
 

@@ -1,5 +1,9 @@
 from sqlalchemy.orm import Session
 
+from app.anomaly.schemas import (
+    AnomalyDetectionResult,
+    EventAnomaly,
+)
 from app.models.investigation_report import (
     InvestigationReportStatus,
 )
@@ -8,6 +12,9 @@ from app.services.analysis_history_service import (
 )
 from app.services.analysis_service import (
     analyse_auth_log,
+)
+from app.services.anomaly_run_service import (
+    save_anomaly_run,
 )
 from app.services.investigation_report_service import (
     create_pending_report,
@@ -34,7 +41,12 @@ AUTH_LOG_CONTENT = """
 """
 
 
-def build_pending_report(
+REQUESTED_BY_USER_ID = (
+    "00000000-0000-0000-0000-000000000001"
+)
+
+
+def build_analysis_and_pending_report(
     session: Session,
 ):
     result = analyse_auth_log(
@@ -53,11 +65,77 @@ def build_pending_report(
         session,
         analysis_id=analysis.id,
         requested_by_user_id=(
-            "00000000-0000-0000-0000-000000000001"
+            REQUESTED_BY_USER_ID
         ),
     )
 
+    return analysis, report
+
+
+def build_pending_report(
+    session: Session,
+):
+    _, report = (
+        build_analysis_and_pending_report(
+            session
+        )
+    )
+
     return report
+
+
+def build_anomaly_result() -> (
+    AnomalyDetectionResult
+):
+    return AnomalyDetectionResult(
+        model_name="IsolationForest",
+        model_version="test-version",
+        total_events=40,
+        analysed_events=40,
+        anomaly_count=1,
+        contamination=0.05,
+        feature_names=[
+            "is_login_failure",
+            "ip_failure_count",
+            "distinct_users_for_ip",
+        ],
+        anomalies=[
+            EventAnomaly(
+                event_index=12,
+                anomaly_score=0.97,
+                reasons=[
+                    (
+                        "Source IP generated a high "
+                        "number of authentication "
+                        "failures."
+                    ),
+                    (
+                        "Source IP interacted with an "
+                        "unusually broad set of "
+                        "accounts."
+                    ),
+                ],
+                features={
+                    "is_login_failure": 1.0,
+                    "ip_failure_count": 8.0,
+                    "distinct_users_for_ip": 8.0,
+                },
+                event={
+                    "timestamp": (
+                        "2026-08-20T03:00:00+00:00"
+                    ),
+                    "source_ip": (
+                        "203.0.113.250"
+                    ),
+                    "username": "target0",
+                    "event_type": (
+                        "LOGIN_FAILURE"
+                    ),
+                },
+            )
+        ],
+        skipped_reason=None,
+    )
 
 
 def test_worker_processing_completes_report(
@@ -90,6 +168,16 @@ def test_worker_processing_completes_report(
 
     assert processed.report_json is not None
     assert processed.grounding_json is not None
+
+    assert (
+        processed.anomaly_json
+        == {
+            "run_id": None,
+            "created_at": None,
+            "result": None,
+        }
+    )
+
     assert processed.completed_at is not None
     assert processed.error_message is None
 
@@ -147,8 +235,17 @@ def test_completed_report_is_not_processed_twice(
 
     assert first.completed_at is not None
 
-    original_completed_at = first.completed_at
-    original_report_json = first.report_json
+    original_completed_at = (
+        first.completed_at
+    )
+
+    original_report_json = (
+        first.report_json
+    )
+
+    original_anomaly_json = (
+        first.anomaly_json
+    )
 
     second = process_investigation_report(
         database_session,
@@ -174,6 +271,11 @@ def test_completed_report_is_not_processed_twice(
     assert (
         second.report_json
         == original_report_json
+    )
+
+    assert (
+        second.anomaly_json
+        == original_anomaly_json
     )
 
     assert second.error_message is None
@@ -206,7 +308,7 @@ def test_worker_persists_threat_intelligence(
         database_session,
         analysis_id=analysis.id,
         requested_by_user_id=(
-            "00000000-0000-0000-0000-000000000001"
+            REQUESTED_BY_USER_ID
         ),
     )
 
@@ -228,7 +330,11 @@ def test_worker_persists_threat_intelligence(
     )
 
     assert processed is not None
-    assert processed.status == "completed"
+
+    assert (
+        processed.status
+        == "completed"
+    )
 
     assert (
         processed.threat_intel_json
@@ -261,3 +367,115 @@ def test_worker_persists_threat_intelligence(
     )
 
     assert threat_provider.call_count == 1
+
+
+def test_worker_persists_anomaly_evidence(
+    database_session: Session,
+) -> None:
+    analysis, report = (
+        build_analysis_and_pending_report(
+            database_session
+        )
+    )
+
+    anomaly_run = save_anomaly_run(
+        database_session,
+        analysis_id=analysis.id,
+        requested_by_user_id=(
+            REQUESTED_BY_USER_ID
+        ),
+        result=build_anomaly_result(),
+    )
+
+    processed = process_investigation_report(
+        database_session,
+        report_id=report.id,
+        provider=FakeInvestigationProvider(),
+        repository=build_fake_attack_repository(),
+    )
+
+    assert processed is not None
+
+    assert (
+        processed.status
+        == InvestigationReportStatus.COMPLETED.value
+    )
+
+    assert processed.anomaly_json is not None
+
+    assert (
+        processed.anomaly_json["run_id"]
+        == anomaly_run.id
+    )
+
+    anomaly_result = (
+        processed.anomaly_json[
+            "result"
+        ]
+    )
+
+    assert (
+        anomaly_result["model_name"]
+        == "IsolationForest"
+    )
+
+    assert (
+        anomaly_result["model_version"]
+        == "test-version"
+    )
+
+    assert (
+        anomaly_result["anomaly_count"]
+        == 1
+    )
+
+    anomalies = (
+        anomaly_result["anomalies"]
+    )
+
+    assert len(anomalies) == 1
+
+    assert (
+        anomalies[0]["anomaly_score"]
+        == 0.97
+    )
+
+    assert (
+        anomalies[0]["event"][
+            "source_ip"
+        ]
+        == "203.0.113.250"
+    )
+
+    assert anomalies[0]["reasons"]
+
+
+def test_worker_records_absence_of_anomaly_evidence(
+    database_session: Session,
+) -> None:
+    report = build_pending_report(
+        database_session
+    )
+
+    processed = process_investigation_report(
+        database_session,
+        report_id=report.id,
+        provider=FakeInvestigationProvider(),
+        repository=build_fake_attack_repository(),
+    )
+
+    assert processed is not None
+
+    assert (
+        processed.status
+        == InvestigationReportStatus.COMPLETED.value
+    )
+
+    assert (
+        processed.anomaly_json
+        == {
+            "run_id": None,
+            "created_at": None,
+            "result": None,
+        }
+    )
