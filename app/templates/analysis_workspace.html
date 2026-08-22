@@ -15,6 +15,11 @@
         rel="stylesheet"
         href="/static/css/dashboard.css"
     >
+
+    <script
+        src="https://unpkg.com/htmx.org@2.0.4"
+        defer
+    ></script>
 </head>
 
 <body>
@@ -42,6 +47,12 @@
             >
                 Analyses
             </a>
+
+            <span
+                class="navigation-item disabled"
+            >
+                Cases
+            </span>
 
         </nav>
 
@@ -92,17 +103,26 @@
 
             <div>
 
+                <div class="eyebrow">
+                    INVESTIGATION
+                </div>
+
                 <h1>
-                    Investigation
+                    Authentication Analysis
                 </h1>
 
-                <p class="subtitle">
-                    Analysis {{ analysis.id }}
+                <p class="subtitle analysis-id">
+                    {{ analysis.id }}
                 </p>
 
             </div>
 
+            <div class="analysis-status">
+                Completed
+            </div>
+
         </header>
+
 
         <section class="metrics">
 
@@ -121,7 +141,7 @@
             <article class="metric-card">
 
                 <span class="metric-label">
-                    Events
+                    Parsed Events
                 </span>
 
                 <strong class="metric-value">
@@ -136,7 +156,12 @@
                     Incidents
                 </span>
 
-                <strong class="metric-value">
+                <strong
+                    class="metric-value
+                    {% if analysis.incident_count > 0 %}
+                        metric-danger
+                    {% endif %}"
+                >
                     {{ analysis.incident_count }}
                 </strong>
 
@@ -145,29 +170,673 @@
             <article class="metric-card">
 
                 <span class="metric-label">
-                    Ignored Lines
+                    ML Anomalies
                 </span>
 
                 <strong class="metric-value">
-                    {{ analysis.ignored_lines }}
+
+                    {% if anomaly_result %}
+
+                        {{
+                            anomaly_result
+                            .anomaly_count
+                        }}
+
+                    {% else %}
+
+                        —
+
+                    {% endif %}
+
                 </strong>
 
             </article>
 
         </section>
 
-        <section class="workspace-card">
+
+        <section class="investigation-grid">
+
+            <div class="investigation-column">
+
+
+                <section class="workspace-card">
+
+                    <div class="workspace-heading">
+
+                        <div>
+
+                            <div class="section-kicker">
+                                RULE ENGINE
+                            </div>
+
+                            <h2>
+                                Deterministic Detections
+                            </h2>
+
+                            <p>
+                                Findings produced by
+                                deterministic security rules.
+                            </p>
+
+                        </div>
+
+                        <span class="count-badge">
+                            {{ incidents | length }}
+                        </span>
+
+                    </div>
+
+
+                    {% if incidents %}
+
+                        <div class="finding-list">
+
+                            {% for incident in incidents %}
+
+                                <article class="finding-card">
+
+                                    <div class="finding-header">
+
+                                        <div>
+
+                                            <span class="danger-label">
+                                                DETECTED
+                                            </span>
+
+                                            <h3>
+
+                                                {{
+                                                    incident.get(
+                                                        "incident_type"
+                                                    )
+                                                    or
+                                                    incident.get(
+                                                        "type"
+                                                    )
+                                                    or
+                                                    incident.get(
+                                                        "name"
+                                                    )
+                                                    or
+                                                    incident.get(
+                                                        "rule"
+                                                    )
+                                                    or
+                                                    "Security incident"
+                                                }}
+
+                                            </h3>
+
+                                        </div>
+
+                                    </div>
+
+                                    <details class="evidence-details">
+
+                                        <summary>
+                                            View structured evidence
+                                        </summary>
+
+                                        <pre>{{ incident | tojson(indent=2) }}</pre>
+
+                                    </details>
+
+                                </article>
+
+                            {% endfor %}
+
+                        </div>
+
+                    {% else %}
+
+                        <div class="section-empty">
+
+                            <strong>
+                                No deterministic incidents detected
+                            </strong>
+
+                            <p>
+                                The rule engine did not identify
+                                activity matching its current
+                                detection rules.
+                            </p>
+
+                        </div>
+
+                    {% endif %}
+
+                </section>
+
+
+                <section class="workspace-card">
+
+                    <div class="workspace-heading">
+
+                        <div>
+
+                            <div class="section-kicker">
+                                EVENT DATA
+                            </div>
+
+                            <h2>
+                                Parsed Security Events
+                            </h2>
+
+                            <p>
+                                Authentication events extracted
+                                from the submitted log.
+                            </p>
+
+                        </div>
+
+                        <span class="count-badge">
+                            {{ events | length }}
+                        </span>
+
+                    </div>
+
+
+                    {% if events %}
+
+                        <div class="table-wrapper">
+
+                            <table class="analysis-table event-table">
+
+                                <thead>
+
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Event</th>
+                                        <th>User</th>
+                                        <th>Source IP</th>
+                                    </tr>
+
+                                </thead>
+
+                                <tbody>
+
+                                    {% for event in events %}
+
+                                        <tr>
+
+                                            <td class="mono">
+
+                                                {{
+                                                    event.get(
+                                                        "timestamp",
+                                                        "—"
+                                                    )
+                                                }}
+
+                                            </td>
+
+                                            <td>
+
+                                                <span class="event-type">
+
+                                                    {{
+                                                        event.get(
+                                                            "event_type"
+                                                        )
+                                                        or
+                                                        event.get(
+                                                            "type"
+                                                        )
+                                                        or
+                                                        "Event"
+                                                    }}
+
+                                                </span>
+
+                                            </td>
+
+                                            <td>
+
+                                                {{
+                                                    event.get(
+                                                        "username"
+                                                    )
+                                                    or
+                                                    event.get(
+                                                        "user"
+                                                    )
+                                                    or
+                                                    "—"
+                                                }}
+
+                                            </td>
+
+                                            <td class="mono">
+
+                                                {{
+                                                    event.get(
+                                                        "source_ip"
+                                                    )
+                                                    or
+                                                    event.get(
+                                                        "ip"
+                                                    )
+                                                    or
+                                                    "—"
+                                                }}
+
+                                            </td>
+
+                                        </tr>
+
+                                    {% endfor %}
+
+                                </tbody>
+
+                            </table>
+
+                        </div>
+
+                    {% else %}
+
+                        <div class="section-empty">
+                            No parsed events are available.
+                        </div>
+
+                    {% endif %}
+
+                </section>
+
+            </div>
+
+
+            <div class="investigation-column">
+
+
+                <section class="workspace-card">
+
+                    <div class="workspace-heading">
+
+                        <div>
+
+                            <div class="section-kicker">
+                                MACHINE LEARNING
+                            </div>
+
+                            <h2>
+                                ML Anomaly Detection
+                            </h2>
+
+                            <p>
+                                Behavioural findings from the
+                                persisted Isolation Forest run.
+                            </p>
+
+                        </div>
+
+                        {% if anomaly_result %}
+
+                            <span class="status-badge status-success">
+                                Model run
+                            </span>
+
+                        {% else %}
+
+                            <span class="status-badge">
+                                Not run
+                            </span>
+
+                        {% endif %}
+
+                    </div>
+
+
+                    {% if anomaly_result %}
+
+                        <div class="model-summary">
+
+                            <div>
+                                <span>Model</span>
+                                <strong>
+                                    {{ anomaly_result.model_name }}
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Version</span>
+                                <strong>
+                                    {{ anomaly_result.model_version }}
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Analysed</span>
+                                <strong>
+                                    {{ anomaly_result.analysed_events }}
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Anomalies</span>
+                                <strong>
+                                    {{ anomaly_result.anomaly_count }}
+                                </strong>
+                            </div>
+
+                        </div>
+
+
+                        {% if anomaly_result.skipped_reason %}
+
+                            <div class="info-message">
+                                {{ anomaly_result.skipped_reason }}
+                            </div>
+
+                        {% elif anomaly_result.anomalies %}
+
+                            <div class="anomaly-list">
+
+                                {% for anomaly in anomaly_result.anomalies %}
+
+                                    <article class="anomaly-card">
+
+                                        <div class="anomaly-header">
+
+                                            <div>
+
+                                                <span class="danger-label">
+                                                    ANOMALY
+                                                </span>
+
+                                                <h3>
+
+                                                    {{
+                                                        anomaly.event.get(
+                                                            "source_ip"
+                                                        )
+                                                        or
+                                                        anomaly.event.get(
+                                                            "username"
+                                                        )
+                                                        or
+                                                        "Authentication event"
+                                                    }}
+
+                                                </h3>
+
+                                            </div>
+
+                                            <div class="score">
+
+                                                {{
+                                                    "%.3f"
+                                                    | format(
+                                                        anomaly.anomaly_score
+                                                    )
+                                                }}
+
+                                            </div>
+
+                                        </div>
+
+
+                                        {% if anomaly.reasons %}
+
+                                            <ul class="reason-list">
+
+                                                {% for reason in anomaly.reasons %}
+
+                                                    <li>
+                                                        {{ reason }}
+                                                    </li>
+
+                                                {% endfor %}
+
+                                            </ul>
+
+                                        {% endif %}
+
+
+                                        <details class="evidence-details">
+
+                                            <summary>
+                                                View model evidence
+                                            </summary>
+
+                                            <pre>{{ anomaly.model_dump(mode="json") | tojson(indent=2) }}</pre>
+
+                                        </details>
+
+                                    </article>
+
+                                {% endfor %}
+
+                            </div>
+
+                        {% else %}
+
+                            <div class="section-empty">
+
+                                <strong>
+                                    No anomalous events identified
+                                </strong>
+
+                                <p>
+                                    The latest ML run completed
+                                    without flagging behavioural
+                                    anomalies.
+                                </p>
+
+                            </div>
+
+                        {% endif %}
+
+                    {% else %}
+
+                        <div class="section-empty">
+
+                            <strong>
+                                Anomaly detection has not been run
+                            </strong>
+
+                            <p>
+                                No persisted ML result exists for
+                                this analysis yet.
+                            </p>
+
+                        </div>
+
+                    {% endif %}
+
+                </section>
+
+
+                <section class="workspace-card">
+
+                    <div class="workspace-heading">
+
+                        <div>
+
+                            <div class="section-kicker">
+                                AI INVESTIGATION
+                            </div>
+
+                            <h2>
+                                Investigation Report
+                            </h2>
+
+                            <p>
+                                AI synthesis grounded in trusted
+                                investigation evidence.
+                            </p>
+
+                        </div>
+
+                        {% if investigation_report %}
+
+                            <span
+                                class="status-badge
+                                {% if investigation_report.status == 'completed' %}
+                                    status-success
+                                {% elif investigation_report.status == 'failed' %}
+                                    status-danger
+                                {% endif %}"
+                            >
+                                {{ investigation_report.status }}
+                            </span>
+
+                        {% else %}
+
+                            <span class="status-badge">
+                                Not generated
+                            </span>
+
+                        {% endif %}
+
+                    </div>
+
+
+                    {% if investigation_report %}
+
+                        <div class="report-meta">
+
+                            <div>
+                                <span>Provider</span>
+                                <strong>
+                                    {{
+                                        investigation_report.provider
+                                        or
+                                        "—"
+                                    }}
+                                </strong>
+                            </div>
+
+                            <div>
+                                <span>Model</span>
+                                <strong>
+                                    {{
+                                        investigation_report.model
+                                        or
+                                        "—"
+                                    }}
+                                </strong>
+                            </div>
+
+                        </div>
+
+
+                        {% if investigation_report.status == "failed" %}
+
+                            <div class="error-message report-error">
+
+                                {{
+                                    investigation_report.error_message
+                                    or
+                                    "Investigation report generation failed."
+                                }}
+
+                            </div>
+
+                        {% elif investigation_report.report_json %}
+
+                            <div class="report-section">
+
+                                <h3>
+                                    AI Investigation
+                                </h3>
+
+                                <pre class="structured-output">{{ investigation_report.report_json | tojson(indent=2) }}</pre>
+
+                            </div>
+
+                        {% else %}
+
+                            <div class="section-empty">
+                                The investigation report is still pending.
+                            </div>
+
+                        {% endif %}
+
+
+                        {% if investigation_report.grounding_json %}
+
+                            <details class="evidence-details evidence-block">
+
+                                <summary>
+                                    MITRE ATT&amp;CK grounding
+                                </summary>
+
+                                <pre>{{ investigation_report.grounding_json | tojson(indent=2) }}</pre>
+
+                            </details>
+
+                        {% endif %}
+
+
+                        {% if investigation_report.threat_intel_json %}
+
+                            <details class="evidence-details evidence-block">
+
+                                <summary>
+                                    Threat intelligence evidence
+                                </summary>
+
+                                <pre>{{ investigation_report.threat_intel_json | tojson(indent=2) }}</pre>
+
+                            </details>
+
+                        {% endif %}
+
+
+                        {% if investigation_report.anomaly_json %}
+
+                            <details class="evidence-details evidence-block">
+
+                                <summary>
+                                    ML evidence used by AI
+                                </summary>
+
+                                <pre>{{ investigation_report.anomaly_json | tojson(indent=2) }}</pre>
+
+                            </details>
+
+                        {% endif %}
+
+                    {% else %}
+
+                        <div class="section-empty">
+
+                            <strong>
+                                No AI investigation report
+                            </strong>
+
+                            <p>
+                                An AI investigation has not yet
+                                been generated for this analysis.
+                            </p>
+
+                        </div>
+
+                    {% endif %}
+
+                </section>
+
+            </div>
+
+        </section>
+
+
+        <section class="workspace-card metadata-card">
 
             <div class="workspace-heading">
 
-                <h2>
-                    Investigation Workspace
-                </h2>
+                <div>
 
-                <p>
-                    Detection, ML and AI evidence will
-                    appear in this workspace.
-                </p>
+                    <div class="section-kicker">
+                        ANALYSIS METADATA
+                    </div>
+
+                    <h2>
+                        Evidence Source
+                    </h2>
+
+                </div>
 
             </div>
 
@@ -175,6 +844,7 @@
 
                 <div>
                     <span>Source type</span>
+
                     <strong>
                         {{ analysis.source_type }}
                     </strong>
@@ -182,6 +852,7 @@
 
                 <div>
                     <span>Source name</span>
+
                     <strong>
                         {{
                             analysis.source_name
@@ -193,12 +864,21 @@
 
                 <div>
                     <span>Created</span>
+
                     <strong>
                         {{
                             analysis.created_at.strftime(
                                 "%Y-%m-%d %H:%M:%S"
                             )
                         }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Ignored lines</span>
+
+                    <strong>
+                        {{ analysis.ignored_lines }}
                     </strong>
                 </div>
 

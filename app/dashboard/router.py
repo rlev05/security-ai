@@ -7,8 +7,9 @@ from app.core.config import get_settings
 from app.core.database import get_database_session
 from app.models.user_record import UserRecord
 from app.services.analysis_history_service import get_analysis_record, list_analysis_records
-from app.services.analysis_history_service import get_analysis_record, list_analysis_records
+from app.services.anomaly_run_service import get_latest_anomaly_run, load_anomaly_result
 from app.services.dashboard_service import get_dashboard_metrics
+from app.services.investigation_report_service import get_latest_investigation_report
 from app.services.security_service import create_access_token, decode_access_token
 from app.services.user_service import authenticate_user
 
@@ -16,40 +17,72 @@ router = APIRouter(
     tags=["Dashboard"],
 )
 
-templates = Jinja2Templates(directory="app/templates")
+
+templates = Jinja2Templates(
+    directory="app/templates",
+)
+
 
 DASHBOARD_COOKIE_NAME = (
     "security_ai_session"
 )
 
-DatabaseSession = Annotated[Session, Depends(get_database_session)]
+
+DatabaseSession = Annotated[
+    Session,
+    Depends(get_database_session),
+]
+
 
 def _get_dashboard_user(
-         request: Request,
-         session: Session
- ) -> UserRecord | None:
-     token = request.cookies.get(DASHBOARD_COOKIE_NAME)
+    request: Request,
+    session: Session,
+) -> UserRecord | None:
+    token = request.cookies.get(
+        DASHBOARD_COOKIE_NAME
+    )
 
-     if token is None:
-         return None
+    if token is None:
+        return None
 
-     try:
-         user_id = decode_access_token(token)
-     except ValueError:
-         return None
+    try:
+        user_id = decode_access_token(
+            token
+        )
+    except ValueError:
+        return None
 
-     user = session.get(
-         UserRecord,
-         user_id
-     )
+    user = session.get(
+        UserRecord,
+        user_id,
+    )
 
-     if (
-         user is None
-         or not user.is_active
-     ):
-         return None
+    if (
+        user is None
+        or not user.is_active
+    ):
+        return None
 
-     return user
+    return user
+
+
+def _get_result_list(
+    result_json: dict,
+    key: str,
+) -> list:
+    value = result_json.get(
+        key,
+        [],
+    )
+
+    if isinstance(
+        value,
+        list,
+    ):
+        return value
+
+    return []
+
 
 @router.get(
     "/",
@@ -273,6 +306,46 @@ def analysis_workspace(
             detail="Analysis not found",
         )
 
+    result_json = (
+        analysis.result_json
+        if isinstance(
+            analysis.result_json,
+            dict,
+        )
+        else {}
+    )
+
+    events = _get_result_list(
+        result_json,
+        "events",
+    )
+
+    incidents = _get_result_list(
+        result_json,
+        "incidents",
+    )
+
+    anomaly_run = get_latest_anomaly_run(
+        session,
+        analysis_id=analysis.id,
+    )
+
+    anomaly_result = None
+
+    if anomaly_run is not None:
+        anomaly_result = (
+            load_anomaly_result(
+                anomaly_run
+            )
+        )
+
+    investigation_report = (
+        get_latest_investigation_report(
+            session,
+            analysis_id=analysis.id,
+        )
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="analysis_workspace.html",
@@ -282,5 +355,15 @@ def analysis_workspace(
             ),
             "current_user": user,
             "analysis": analysis,
+            "events": events,
+            "incidents": incidents,
+            "anomaly_run": anomaly_run,
+            "anomaly_result": (
+                anomaly_result
+            ),
+            "investigation_report": (
+                investigation_report
+            ),
         },
     )
+
