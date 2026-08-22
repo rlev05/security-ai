@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>{{ page_title }}</title>
+
+    <link
+        rel="stylesheet"
+        href="/static/css/dashboard.css"
+    >
+
+    <script
+        src="https://unpkg.com/htmx.org@2.0.4"
+        defer
+    ></script>
+</head>
+
+<body>
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+
+        <div class="brand">
+            SECURITY AI
+        </div>
+
+        <nav class="navigation">
+
+            <a
+                href="/dashboard"
+                class="navigation-item active"
+            >
+                Dashboard
+            </a>
+
+            <a
+                href="#"
+                class="navigation-item"
+            >
+                Analyses
+            </a>
+
+            <a
+                href="#"
+                class="navigation-item"
+            >
+                Cases
+            </a>
+
+        </nav>
+
+    </aside>
+
+    <main class="main-content">
+
+        <header class="topbar">
+
+            <div>
+                <h1>Analyst Dashboard</h1>
+
+                <p class="subtitle">
+                    Security investigation workspace
+                </p>
+            </div>
+
+            <div class="analyst">
+                Analyst
+            </div>
+
+        </header>
+
+        <section class="metrics">
+
+            <article class="metric-card">
+                <span class="metric-label">
+                    Analyses
+                </span>
+
+                <strong class="metric-value">
+                    —
+                </strong>
+            </article>
+
+            <article class="metric-card">
+                <span class="metric-label">
+                    Incidents
+                </span>
+
+                <strong class="metric-value">
+                    —
+                </strong>
+            </article>
+
+            <article class="metric-card">
+                <span class="metric-label">
+                    ML Anomalies
+                </span>
+
+                <strong class="metric-value">
+                    —
+                </strong>
+            </article>
+
+            <article class="metric-card">
+                <span class="metric-label">
+                    Open Cases
+                </span>
+
+                <strong class="metric-value">
+                    —
+                </strong>
+            </article>
+
+        </section>
+
+        <section class="workspace-card">
+
+            <div class="workspace-heading">
+
+                <div>
+                    <h2>
+                        Investigation Workspace
+                    </h2>
+
+                    <p>
+                        Select an analysis to begin
+                        investigating security activity.
+                    </p>
+                </div>
+
+            </div>
+
+            <div class="empty-state">
+
+                <div class="empty-state-icon">
+                    ◇
+                </div>
+
+                <h3>
+                    No analysis selected
+                </h3>
+
+                <p>
+                    Your recent analyses will appear here
+                    once the dashboard is connected to the
+                    investigation API.
+                </p>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+</body>
+</html>

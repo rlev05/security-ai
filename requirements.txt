@@ -44,3 +44,5 @@ structlog
 celery[redis]>=5.6,<6
 
 scikit-learn>=1.5,<2.0
+
+jinja2
