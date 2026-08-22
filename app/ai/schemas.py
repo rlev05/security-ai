@@ -1,12 +1,12 @@
 from enum import StrEnum
 from typing import Any
-
+from datetime import datetime
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
 )
-
+from app.anomaly.schemas import AnomalyDetectionResult
 from app.knowledge.schemas import (
     AttackGroundingContext,
 )
@@ -27,6 +27,25 @@ class EvidenceBasis(StrEnum):
     THREAT_INTELLIGENCE = "threat_intelligence"
     AI_INFERENCE = "ai_inference"
 
+class AnomalyEvidenceContext(BaseModel):
+    """
+    Persisted behavioural anomaly evidence supplied to
+    an AI investigation.
+
+    Anomaly findings are supporting ML signals rather than
+    deterministic proof that malicious activity occurred.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    run_id: str | None = None
+
+    created_at: datetime | None = None
+
+    result: AnomalyDetectionResult | None = None
+
 
 class AnalysisEvidence(BaseModel):
     """Evidence supplied to an AI investigation provider."""
@@ -42,6 +61,10 @@ class AnalysisEvidence(BaseModel):
 
     attack_context: AttackGroundingContext
     threat_intel_context: ThreatIntelContext
+
+    anomaly_context: AnomalyEvidenceContext = Field(
+        default_factory=AnomalyEvidenceContext,
+    )
 
 
 class KeyFinding(BaseModel):

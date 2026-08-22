@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
-
+from app.ai.schemas import AnalysisEvidence, AnomalyEvidenceContext
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
+from app.services.anomaly_run_service import get_latest_anomaly_run, load_anomaly_result
 from app.ai.grounding import (
     validate_and_normalise_grounded_report,
 )
@@ -36,12 +36,44 @@ from app.services.threat_intel_service import (
 )
 
 
+def build_anomaly_evidence_context(
+        session: Session,
+        *,
+        analysis_id: str,
+) -> AnomalyEvidenceContext:
+    """
+    Build AI-ready anomaly evidence from the latest persisted
+    ML run for an analysis.
+
+    Investigation generation does not automatically retrain the
+    anomaly model. Only previously persisted ML evidence is used.
+    """
+
+    record = get_latest_anomaly_run(
+        session,
+        analysis_id=analysis_id
+    )
+
+    if record is None:
+        return AnomalyEvidenceContext()
+
+    result = load_anomaly_result(record)
+
+    return AnomalyEvidenceContext(
+        run_id=record.id,
+        created_at=record.created_at,
+        result=result
+    )
+
 def build_analysis_evidence(
     analysis: AnalysisRecord,
     repository: AttackKnowledgeRepository,
     threat_intel_context: (
         ThreatIntelContext | None
-    ) = None
+    ) = None,
+    anomaly_context: (
+        AnomalyEvidenceContext | None
+    ) = None,
 ) -> AnalysisEvidence:
     """Build AI evidence with trusted ATT&CK grounding."""
 
@@ -54,6 +86,10 @@ def build_analysis_evidence(
     if threat_intel_context is None:
         threat_intel_context = ThreatIntelContext()
 
+
+    if anomaly_context is None:
+        anomaly_context = AnomalyEvidenceContext()
+
     return AnalysisEvidence(
         analysis_id=analysis.id,
         source_type=analysis.source_type,
@@ -62,7 +98,8 @@ def build_analysis_evidence(
         ignored_lines=analysis.ignored_lines,
         result=analysis.result_json,
         attack_context=attack_context,
-        threat_intel_context=threat_intel_context
+        threat_intel_context=threat_intel_context,
+        anomaly_context=anomaly_context
     )
 
 
@@ -245,10 +282,18 @@ def process_investigation_report(
             )
         )
 
+    anomaly_context = (
+        build_anomaly_evidence_context(
+            session,
+            analysis_id=analysis.id
+        )
+    )
+
     evidence = build_analysis_evidence(
         analysis,
         repository,
         threat_intel_context,
+        anomaly_context,
     )
 
     try:
