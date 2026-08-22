@@ -1,4 +1,5 @@
 from typing import Any
+from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -60,3 +61,37 @@ class AnomalyDetectionResult(BaseModel):
     )
 
     skipped_reason: str | None = None
+
+
+
+class AnomalyRunSummary(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    id: str
+    analysis_id: str
+    model_name: str
+    model_version: str
+
+    contamination: float = Field(
+        gt=0.0,
+        lt=0.5,
+    )
+
+    total_events: int = Field(
+        ge=0
+    )
+
+    analysed_events: int = Field(
+        ge=0,
+    )
+
+    anomaly_count: int = Field(
+        ge=0,
+    )
+
+    created_at: datetime
+
+class AnomalyRunResponse(AnomalyRunSummary):
+    result: AnomalyDetectionResult

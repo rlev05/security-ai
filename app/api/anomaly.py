@@ -1,4 +1,7 @@
-from typing import Annotated, Any
+from typing import (
+    Annotated,
+    Any,
+)
 
 from fastapi import (
     APIRouter,
@@ -14,7 +17,8 @@ from app.anomaly.detector import (
     detect_event_anomalies,
 )
 from app.anomaly.schemas import (
-    AnomalyDetectionResult,
+    AnomalyRunResponse,
+    AnomalyRunSummary,
 )
 from app.api.auth_dependencies import (
     get_current_user,
@@ -22,12 +26,21 @@ from app.api.auth_dependencies import (
 from app.core.database import (
     get_database_session,
 )
+from app.models.anomaly_run_record import (
+    AnomalyRunRecord,
+)
 from app.models.user import UserRole
 from app.models.user_record import (
     UserRecord,
 )
 from app.services.analysis_history_service import (
     get_analysis_record,
+)
+from app.services.anomaly_run_service import (
+    get_latest_anomaly_run,
+    list_anomaly_runs,
+    load_anomaly_result,
+    save_anomaly_run,
 )
 
 
@@ -79,14 +92,6 @@ def _normalise_event_list(
 def _find_nested_events(
     value: Any,
 ) -> list[dict[str, Any]]:
-    """
-    Find the first structured event collection in a persisted
-    analysis payload.
-
-    Analysis history may contain the analysis result inside a
-    wrapper object rather than storing `events` at the root.
-    """
-
     if isinstance(
         value,
         dict,
@@ -101,36 +106,9 @@ def _find_nested_events(
             if events:
                 return events
 
-        # Check common analysis wrapper fields first.
-        for key in (
-            "analysis",
-            "result",
-            "analysis_result",
-            "data",
+        for nested_value in (
+            value.values()
         ):
-            if key not in value:
-                continue
-
-            events = (
-                _find_nested_events(
-                    value[key]
-                )
-            )
-
-            if events:
-                return events
-
-        # Fall back to remaining nested dictionaries/lists.
-        for key, nested_value in value.items():
-            if key in {
-                "analysis",
-                "result",
-                "analysis_result",
-                "data",
-                "events",
-            }:
-                continue
-
             if not isinstance(
                 nested_value,
                 (
@@ -178,37 +156,17 @@ def _find_nested_events(
 def _extract_events(
     result_json: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """
-    Extract structured security events from a persisted
-    analysis result.
-
-    Raw log content is never supplied directly to the ML model.
-    """
-
     return _find_nested_events(
         result_json
     )
 
 
-@router.get(
-    "/{analysis_id}/anomalies",
-    response_model=AnomalyDetectionResult,
-)
-def analyse_persisted_events_for_anomalies(
+def _get_visible_analysis(
+    database: Session,
+    *,
     analysis_id: str,
-    database: DatabaseSession,
-    current_user: CurrentUser,
-    contamination: Annotated[
-        float,
-        Query(
-            gt=0.0,
-            lt=0.5,
-            description=(
-                "Expected proportion of anomalous events."
-            ),
-        ),
-    ] = DEFAULT_CONTAMINATION,
-) -> AnomalyDetectionResult:
+    current_user: UserRecord,
+):
     owner_user_id = (
         None
         if _is_admin(
@@ -233,6 +191,69 @@ def analyse_persisted_events_for_anomalies(
             ),
         )
 
+    return analysis
+
+
+def _build_run_summary(
+    record: AnomalyRunRecord,
+) -> AnomalyRunSummary:
+    return AnomalyRunSummary(
+        id=record.id,
+        analysis_id=record.analysis_id,
+        model_name=record.model_name,
+        model_version=record.model_version,
+        contamination=record.contamination,
+        total_events=record.total_events,
+        analysed_events=(
+            record.analysed_events
+        ),
+        anomaly_count=record.anomaly_count,
+        created_at=record.created_at,
+    )
+
+
+def _build_run_response(
+    record: AnomalyRunRecord,
+) -> AnomalyRunResponse:
+    result = load_anomaly_result(
+        record
+    )
+
+    return AnomalyRunResponse(
+        **_build_run_summary(
+            record
+        ).model_dump(),
+        result=result,
+    )
+
+
+@router.post(
+    "/{analysis_id}/anomalies",
+    response_model=AnomalyRunResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def run_anomaly_detection(
+    analysis_id: str,
+    database: DatabaseSession,
+    current_user: CurrentUser,
+    contamination: Annotated[
+        float,
+        Query(
+            gt=0.0,
+            lt=0.5,
+            description=(
+                "Expected proportion of "
+                "anomalous events."
+            ),
+        ),
+    ] = DEFAULT_CONTAMINATION,
+) -> AnomalyRunResponse:
+    analysis = _get_visible_analysis(
+        database,
+        analysis_id=analysis_id,
+        current_user=current_user,
+    )
+
     result_json = (
         analysis.result_json
         if isinstance(
@@ -246,7 +267,101 @@ def analyse_persisted_events_for_anomalies(
         result_json
     )
 
-    return detect_event_anomalies(
+    result = detect_event_anomalies(
         events,
         contamination=contamination,
     )
+
+    record = save_anomaly_run(
+        database,
+        analysis_id=analysis.id,
+        requested_by_user_id=(
+            current_user.id
+        ),
+        result=result,
+    )
+
+    return _build_run_response(
+        record
+    )
+
+
+@router.get(
+    "/{analysis_id}/anomalies",
+    response_model=AnomalyRunResponse,
+)
+def get_latest_anomaly_detection(
+    analysis_id: str,
+    database: DatabaseSession,
+    current_user: CurrentUser,
+) -> AnomalyRunResponse:
+    analysis = _get_visible_analysis(
+        database,
+        analysis_id=analysis_id,
+        current_user=current_user,
+    )
+
+    record = get_latest_anomaly_run(
+        database,
+        analysis_id=analysis.id,
+    )
+
+    if record is None:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+            ),
+            detail=(
+                "No anomaly-detection run "
+                "exists for this analysis"
+            ),
+        )
+
+    return _build_run_response(
+        record
+    )
+
+
+@router.get(
+    "/{analysis_id}/anomalies/history",
+    response_model=list[
+        AnomalyRunSummary
+    ],
+)
+def get_anomaly_detection_history(
+    analysis_id: str,
+    database: DatabaseSession,
+    current_user: CurrentUser,
+    limit: Annotated[
+        int,
+        Query(
+            ge=1,
+            le=100,
+        ),
+    ] = 20,
+    offset: Annotated[
+        int,
+        Query(
+            ge=0,
+        ),
+    ] = 0,
+) -> list[AnomalyRunSummary]:
+    analysis = _get_visible_analysis(
+        database,
+        analysis_id=analysis_id,
+        current_user=current_user,
+    )
+
+    records = list_anomaly_runs(
+        database,
+        analysis_id=analysis.id,
+        limit=limit,
+        offset=offset,
+    )
+
+    return [
+        _build_run_summary(
+            record
+        )
+        for record in records
+    ]

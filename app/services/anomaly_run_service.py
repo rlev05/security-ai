@@ -91,7 +91,36 @@ def load_anomaly_result(
 
     return AnomalyDetectionResult.model_validate(record.result_json)
 
+def list_anomaly_runs(
+    session: Session,
+    *,
+    analysis_id: str,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[AnomalyRunRecord]:
+    """
+    Return persisted anomaly runs for one analysis,
+    newest first.
+    """
 
+    statement = (
+        select(AnomalyRunRecord)
+        .where(
+            AnomalyRunRecord.analysis_id
+            == analysis_id
+        )
+        .order_by(
+            AnomalyRunRecord.created_at.desc()
+        )
+        .offset(offset)
+        .limit(limit)
+    )
+
+    return list(
+        session.scalars(
+            statement
+        ).all()
+    )
 
 
 
