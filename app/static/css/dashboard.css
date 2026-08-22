@@ -27,7 +27,8 @@ a {
 }
 
 button,
-input {
+input,
+select {
     font: inherit;
 }
 
@@ -230,6 +231,167 @@ input {
     color: #94a3b8;
     line-height: 1.5;
     margin: 6px 0 0;
+}
+
+.workspace-actions {
+    background: #111821;
+    border: 1px solid #222d3a;
+    border-radius: 12px;
+    display: grid;
+    gap: 22px;
+    grid-template-columns:
+        minmax(0, 1fr)
+        minmax(320px, 0.8fr);
+    margin-bottom: 24px;
+    padding: 22px 24px;
+}
+
+.workspace-action-group h2,
+.case-workflow h3 {
+    margin: 0;
+}
+
+.workspace-action-group p {
+    color: #94a3b8;
+    line-height: 1.5;
+    margin: 6px 0 18px;
+}
+
+.action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.action-button {
+    margin: 0;
+}
+
+.primary-button {
+    background: #14b8a6;
+    border: 0;
+    border-radius: 8px;
+    color: #062925;
+    cursor: pointer;
+    font-weight: 700;
+    margin-top: 4px;
+    padding: 11px 16px;
+}
+
+.primary-button:hover {
+    background: #2dd4bf;
+}
+
+.secondary-button {
+    background: #17202b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: #cbd5e1;
+    cursor: pointer;
+    font-weight: 700;
+    padding: 10px 14px;
+}
+
+.secondary-button:hover {
+    background: #1f2b38;
+    border-color: #475569;
+}
+
+.secondary-button:disabled,
+.primary-button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+}
+
+.case-workflow {
+    border-left: 1px solid #26313e;
+    padding-left: 22px;
+}
+
+.case-workflow-header {
+    margin-bottom: 14px;
+}
+
+.linked-case-list {
+    margin-bottom: 14px;
+}
+
+.case-label {
+    color: #64748b;
+    display: block;
+    font-size: 11px;
+    margin-bottom: 7px;
+    text-transform: uppercase;
+}
+
+.case-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.case-badge {
+    background: #182b2c;
+    border: 1px solid #28514e;
+    border-radius: 999px;
+    color: #5eead4;
+    font-size: 11px;
+    padding: 5px 9px;
+}
+
+.case-form {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.case-form input,
+.case-form select {
+    background: #0b1118;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: #e5e7eb;
+    min-width: 0;
+    outline: none;
+    padding: 9px 10px;
+}
+
+.case-form input {
+    flex: 1;
+}
+
+.case-form select {
+    max-width: 220px;
+}
+
+.case-form input:focus,
+.case-form select:focus {
+    border-color: #5eead4;
+}
+
+.action-message,
+.action-error {
+    border-radius: 9px;
+    font-size: 14px;
+    margin-bottom: 18px;
+    padding: 12px 14px;
+}
+
+.action-message {
+    background: #10241f;
+    border: 1px solid #205447;
+    color: #99f6e4;
+}
+
+.action-error {
+    background: #351b21;
+    border: 1px solid #6b2b35;
+    color: #fca5a5;
+}
+
+.htmx-request {
+    cursor: wait;
+    opacity: 0.72;
 }
 
 .investigation-grid {
@@ -680,21 +842,6 @@ input {
     border-color: #5eead4;
 }
 
-.primary-button {
-    background: #14b8a6;
-    border: 0;
-    border-radius: 8px;
-    color: #062925;
-    cursor: pointer;
-    font-weight: 700;
-    margin-top: 4px;
-    padding: 11px 16px;
-}
-
-.primary-button:hover {
-    background: #2dd4bf;
-}
-
 .error-message {
     background: #351b21;
     border: 1px solid #6b2b35;
@@ -721,6 +868,19 @@ input {
 @media (max-width: 1150px) {
     .investigation-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 1000px) {
+    .workspace-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .case-workflow {
+        border-left: 0;
+        border-top: 1px solid #26313e;
+        padding-left: 0;
+        padding-top: 20px;
     }
 }
 
@@ -776,5 +936,22 @@ input {
     .topbar {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .case-form {
+        flex-direction: column;
+    }
+
+    .case-form select {
+        max-width: none;
+        width: 100%;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+    }
+
+    .action-button {
+        width: 100%;
     }
 }
