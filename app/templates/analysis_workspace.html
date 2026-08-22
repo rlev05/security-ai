@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>{{ page_title }}</title>
+
+    <link
+        rel="stylesheet"
+        href="/static/css/dashboard.css"
+    >
+</head>
+
+<body>
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+
+        <div class="brand">
+            SECURITY AI
+        </div>
+
+        <nav class="navigation">
+
+            <a
+                href="/dashboard"
+                class="navigation-item"
+            >
+                Dashboard
+            </a>
+
+            <a
+                href="/dashboard"
+                class="navigation-item active"
+            >
+                Analyses
+            </a>
+
+        </nav>
+
+        <div class="sidebar-footer">
+
+            <div class="signed-in-user">
+
+                <span class="signed-in-label">
+                    Signed in as
+                </span>
+
+                <strong>
+                    {{ current_user.username }}
+                </strong>
+
+            </div>
+
+            <form
+                method="post"
+                action="/logout"
+            >
+                <button
+                    type="submit"
+                    class="logout-button"
+                >
+                    Sign out
+                </button>
+            </form>
+
+        </div>
+
+    </aside>
+
+    <main class="main-content">
+
+        <div class="back-link-wrapper">
+
+            <a
+                href="/dashboard"
+                class="back-link"
+            >
+                ← Back to dashboard
+            </a>
+
+        </div>
+
+        <header class="topbar">
+
+            <div>
+
+                <h1>
+                    Investigation
+                </h1>
+
+                <p class="subtitle">
+                    Analysis {{ analysis.id }}
+                </p>
+
+            </div>
+
+        </header>
+
+        <section class="metrics">
+
+            <article class="metric-card">
+
+                <span class="metric-label">
+                    Total Lines
+                </span>
+
+                <strong class="metric-value">
+                    {{ analysis.total_lines }}
+                </strong>
+
+            </article>
+
+            <article class="metric-card">
+
+                <span class="metric-label">
+                    Events
+                </span>
+
+                <strong class="metric-value">
+                    {{ analysis.event_count }}
+                </strong>
+
+            </article>
+
+            <article class="metric-card">
+
+                <span class="metric-label">
+                    Incidents
+                </span>
+
+                <strong class="metric-value">
+                    {{ analysis.incident_count }}
+                </strong>
+
+            </article>
+
+            <article class="metric-card">
+
+                <span class="metric-label">
+                    Ignored Lines
+                </span>
+
+                <strong class="metric-value">
+                    {{ analysis.ignored_lines }}
+                </strong>
+
+            </article>
+
+        </section>
+
+        <section class="workspace-card">
+
+            <div class="workspace-heading">
+
+                <h2>
+                    Investigation Workspace
+                </h2>
+
+                <p>
+                    Detection, ML and AI evidence will
+                    appear in this workspace.
+                </p>
+
+            </div>
+
+            <div class="analysis-metadata">
+
+                <div>
+                    <span>Source type</span>
+                    <strong>
+                        {{ analysis.source_type }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Source name</span>
+                    <strong>
+                        {{
+                            analysis.source_name
+                            or
+                            "Pasted authentication log"
+                        }}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Created</span>
+                    <strong>
+                        {{
+                            analysis.created_at.strftime(
+                                "%Y-%m-%d %H:%M:%S"
+                            )
+                        }}
+                    </strong>
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+</body>
+
+</html>

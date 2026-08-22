@@ -35,6 +35,8 @@ a {
 .sidebar {
     background: #10161f;
     border-right: 1px solid #202a36;
+    display: flex;
+    flex-direction: column;
     padding: 28px 20px;
 }
 
@@ -69,6 +71,44 @@ a {
 .navigation-item.active {
     background: #182b2c;
     color: #5eead4;
+}
+
+.navigation-item.disabled {
+    cursor: default;
+    opacity: 0.45;
+}
+
+.sidebar-footer {
+    border-top: 1px solid #202a36;
+    margin-top: auto;
+    padding-top: 20px;
+}
+
+.signed-in-user {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 14px;
+}
+
+.signed-in-label {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.logout-button {
+    background: transparent;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 8px 12px;
+    width: 100%;
+}
+
+.logout-button:hover {
+    border-color: #475569;
+    color: #f8fafc;
 }
 
 .main-content {
@@ -173,10 +213,205 @@ a {
     max-width: 480px;
 }
 
+.table-wrapper {
+    overflow-x: auto;
+}
+
+.analysis-table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.analysis-table th,
+.analysis-table td {
+    border-bottom: 1px solid #222d3a;
+    padding: 16px 20px;
+    text-align: left;
+}
+
+.analysis-table th {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.analysis-table tbody tr:hover {
+    background: #141d27;
+}
+
+.source-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.source-cell span {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.incident-badge {
+    background: #3b1d22;
+    border: 1px solid #6b2b35;
+    border-radius: 999px;
+    color: #fca5a5;
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 26px;
+    padding: 3px 8px;
+    text-align: center;
+}
+
+.table-action {
+    color: #5eead4;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.table-action:hover {
+    text-decoration: underline;
+}
+
+.login-body {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+.login-shell {
+    padding: 24px;
+    width: 100%;
+}
+
+.login-card {
+    background: #111821;
+    border: 1px solid #222d3a;
+    border-radius: 14px;
+    margin: 0 auto;
+    max-width: 430px;
+    padding: 36px;
+}
+
+.login-brand {
+    color: #5eead4;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    margin-bottom: 30px;
+}
+
+.login-card h1 {
+    margin: 0;
+}
+
+.login-description {
+    color: #94a3b8;
+    line-height: 1.6;
+    margin-bottom: 26px;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+}
+
+.login-form label {
+    color: #cbd5e1;
+    font-size: 14px;
+    margin-bottom: 7px;
+}
+
+.login-form input {
+    background: #0b1118;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: #f8fafc;
+    font: inherit;
+    margin-bottom: 18px;
+    outline: none;
+    padding: 11px 12px;
+}
+
+.login-form input:focus {
+    border-color: #5eead4;
+}
+
+.primary-button {
+    background: #14b8a6;
+    border: 0;
+    border-radius: 8px;
+    color: #062925;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 700;
+    margin-top: 4px;
+    padding: 11px 16px;
+}
+
+.primary-button:hover {
+    background: #2dd4bf;
+}
+
+.error-message {
+    background: #351b21;
+    border: 1px solid #6b2b35;
+    border-radius: 8px;
+    color: #fca5a5;
+    font-size: 14px;
+    margin-bottom: 20px;
+    padding: 11px 13px;
+}
+
+.back-link-wrapper {
+    margin-bottom: 18px;
+}
+
+.back-link {
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+.back-link:hover {
+    color: #5eead4;
+}
+
+.analysis-metadata {
+    display: grid;
+    gap: 20px;
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+    padding: 24px;
+}
+
+.analysis-metadata div {
+    background: #0d141c;
+    border: 1px solid #202a36;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 16px;
+}
+
+.analysis-metadata span {
+    color: #64748b;
+    font-size: 12px;
+}
+
 @media (max-width: 900px) {
     .metrics {
         grid-template-columns:
             repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 800px) {
+    .analysis-metadata {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -194,11 +429,20 @@ a {
         flex-direction: row;
     }
 
+    .sidebar-footer {
+        margin-top: 20px;
+    }
+
     .main-content {
         padding: 22px;
     }
 
     .metrics {
         grid-template-columns: 1fr;
+    }
+
+    .topbar {
+        align-items: flex-start;
+        gap: 16px;
     }
 }

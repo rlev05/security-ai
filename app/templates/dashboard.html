@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
 
@@ -41,20 +42,45 @@
             </a>
 
             <a
-                href="#"
+                href="/dashboard"
                 class="navigation-item"
             >
                 Analyses
             </a>
 
-            <a
-                href="#"
-                class="navigation-item"
+            <span
+                class="navigation-item disabled"
             >
                 Cases
-            </a>
+            </span>
 
         </nav>
+
+        <div class="sidebar-footer">
+
+            <div class="signed-in-user">
+                <span class="signed-in-label">
+                    Signed in as
+                </span>
+
+                <strong>
+                    {{ current_user.username }}
+                </strong>
+            </div>
+
+            <form
+                method="post"
+                action="/logout"
+            >
+                <button
+                    type="submit"
+                    class="logout-button"
+                >
+                    Sign out
+                </button>
+            </form>
+
+        </div>
 
     </aside>
 
@@ -63,15 +89,19 @@
         <header class="topbar">
 
             <div>
-                <h1>Analyst Dashboard</h1>
+
+                <h1>
+                    Analyst Dashboard
+                </h1>
 
                 <p class="subtitle">
                     Security investigation workspace
                 </p>
+
             </div>
 
             <div class="analyst">
-                Analyst
+                {{ current_user.username }}
             </div>
 
         </header>
@@ -79,43 +109,51 @@
         <section class="metrics">
 
             <article class="metric-card">
+
                 <span class="metric-label">
                     Analyses
                 </span>
 
                 <strong class="metric-value">
-                    —
+                    {{ metrics.analyses }}
                 </strong>
+
             </article>
 
             <article class="metric-card">
+
+                <span class="metric-label">
+                    Parsed Events
+                </span>
+
+                <strong class="metric-value">
+                    {{ metrics.events }}
+                </strong>
+
+            </article>
+
+            <article class="metric-card">
+
                 <span class="metric-label">
                     Incidents
                 </span>
 
                 <strong class="metric-value">
-                    —
+                    {{ metrics.incidents }}
                 </strong>
+
             </article>
 
             <article class="metric-card">
+
                 <span class="metric-label">
-                    ML Anomalies
+                    Ignored Lines
                 </span>
 
                 <strong class="metric-value">
-                    —
+                    {{ metrics.ignored_lines }}
                 </strong>
-            </article>
 
-            <article class="metric-card">
-                <span class="metric-label">
-                    Open Cases
-                </span>
-
-                <strong class="metric-value">
-                    —
-                </strong>
             </article>
 
         </section>
@@ -125,35 +163,141 @@
             <div class="workspace-heading">
 
                 <div>
+
                     <h2>
-                        Investigation Workspace
+                        Recent Analyses
                     </h2>
 
                     <p>
-                        Select an analysis to begin
-                        investigating security activity.
+                        Open a completed analysis to
+                        investigate its security findings.
                     </p>
+
                 </div>
 
             </div>
 
-            <div class="empty-state">
+            {% if recent_analyses %}
 
-                <div class="empty-state-icon">
-                    ◇
+                <div class="table-wrapper">
+
+                    <table class="analysis-table">
+
+                        <thead>
+
+                            <tr>
+                                <th>Source</th>
+                                <th>Events</th>
+                                <th>Incidents</th>
+                                <th>Ignored</th>
+                                <th>Created</th>
+                                <th></th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            {% for analysis in recent_analyses %}
+
+                                <tr>
+
+                                    <td>
+
+                                        <div class="source-cell">
+
+                                            <strong>
+                                                {{
+                                                    analysis.source_name
+                                                    or
+                                                    "Pasted authentication log"
+                                                }}
+                                            </strong>
+
+                                            <span>
+                                                {{ analysis.source_type }}
+                                            </span>
+
+                                        </div>
+
+                                    </td>
+
+                                    <td>
+                                        {{ analysis.event_count }}
+                                    </td>
+
+                                    <td>
+
+                                        {% if analysis.incident_count > 0 %}
+
+                                            <span class="incident-badge">
+                                                {{
+                                                    analysis.incident_count
+                                                }}
+                                            </span>
+
+                                        {% else %}
+
+                                            0
+
+                                        {% endif %}
+
+                                    </td>
+
+                                    <td>
+                                        {{ analysis.ignored_lines }}
+                                    </td>
+
+                                    <td>
+                                        {{
+                                            analysis.created_at.strftime(
+                                                "%Y-%m-%d %H:%M"
+                                            )
+                                        }}
+                                    </td>
+
+                                    <td>
+
+                                        <a
+                                            class="table-action"
+                                            href="/dashboard/analysis/{{ analysis.id }}"
+                                        >
+                                            Investigate
+                                        </a>
+
+                                    </td>
+
+                                </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
                 </div>
 
-                <h3>
-                    No analysis selected
-                </h3>
+            {% else %}
 
-                <p>
-                    Your recent analyses will appear here
-                    once the dashboard is connected to the
-                    investigation API.
-                </p>
+                <div class="empty-state">
 
-            </div>
+                    <div class="empty-state-icon">
+                        ◇
+                    </div>
+
+                    <h3>
+                        No analyses yet
+                    </h3>
+
+                    <p>
+                        Run an authentication-log analysis
+                        and it will appear here for
+                        investigation.
+                    </p>
+
+                </div>
+
+            {% endif %}
 
         </section>
 
@@ -162,4 +306,5 @@
 </div>
 
 </body>
+
 </html>
