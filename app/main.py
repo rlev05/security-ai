@@ -4,7 +4,7 @@ from app.api.auth import router as auth_router
 from app.api.ai_reports import router as ai_reports_router
 from app.api.cases import router as cases_router
 from app.api.anomaly import router as anomaly_router
-
+from app.api.workspace import router as workspace_router
 app = FastAPI(
     title="Security AI Platform",
     description=(
@@ -18,7 +18,7 @@ app.include_router(auth_router)
 app.include_router(ai_reports_router)
 app.include_router(cases_router)
 app.include_router(anomaly_router)
-
+app.include_router(workspace_router)
 @app.get("/health")
 def health_check() -> dict[str, str]:
     return {
