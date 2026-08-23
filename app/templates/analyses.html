@@ -16,10 +16,10 @@
         href="/static/css/dashboard.css"
     >
 
-    <script
-        src="https://unpkg.com/htmx.org@2.0.4"
-        defer
-    ></script>
+    <link
+        rel="stylesheet"
+        href="/static/css/analyses.css"
+    >
 </head>
 
 <body>
@@ -36,14 +36,14 @@
 
             <a
                 href="/dashboard"
-                class="navigation-item active"
+                class="navigation-item"
             >
                 Dashboard
             </a>
 
             <a
                 href="/dashboard/analyses"
-                class="navigation-item"
+                class="navigation-item active"
             >
                 Analyses
             </a>
@@ -76,8 +76,8 @@
                 action="/logout"
             >
                 <button
-                    type="submit"
                     class="logout-button"
+                    type="submit"
                 >
                     Sign out
                 </button>
@@ -94,72 +94,58 @@
 
             <div>
 
+                <div class="eyebrow">
+                    ANALYSIS HISTORY
+                </div>
+
                 <h1>
-                    Analyst Dashboard
+                    Security Analyses
                 </h1>
 
                 <p class="subtitle">
-                    Security investigation workspace
+                    Browse persisted authentication-log
+                    analyses and continue investigations.
                 </p>
 
-            </div>
-
-            <div class="analyst">
-                {{ current_user.username }}
             </div>
 
         </header>
 
 
-        <section class="metrics">
+        <section class="metrics analyses-metrics">
 
             <article class="metric-card">
 
                 <span class="metric-label">
-                    Analyses
+                    Total Analyses
                 </span>
 
                 <strong class="metric-value">
-                    {{ metrics.analyses }}
+                    {{ total_count }}
                 </strong>
 
             </article>
 
-
             <article class="metric-card">
 
                 <span class="metric-label">
-                    Parsed Events
+                    Current Page
                 </span>
 
                 <strong class="metric-value">
-                    {{ metrics.events }}
+                    {{ page }}
                 </strong>
 
             </article>
 
-
             <article class="metric-card">
 
                 <span class="metric-label">
-                    Incidents
+                    Total Pages
                 </span>
 
                 <strong class="metric-value">
-                    {{ metrics.incidents }}
-                </strong>
-
-            </article>
-
-
-            <article class="metric-card">
-
-                <span class="metric-label">
-                    Ignored Lines
-                </span>
-
-                <strong class="metric-value">
-                    {{ metrics.ignored_lines }}
+                    {{ total_pages }}
                 </strong>
 
             </article>
@@ -173,30 +159,51 @@
 
                 <div>
 
+                    <div class="section-kicker">
+                        PERSISTED EVIDENCE
+                    </div>
+
                     <h2>
-                        Recent Analyses
+                        Analysis History
                     </h2>
 
-                    <p>
-                        Open a completed analysis to
-                        investigate its security findings.
-                    </p>
+                    {% if total_count %}
+
+                        <p>
+                            Showing
+                            {{ first_record_number }}
+                            –
+                            {{ last_record_number }}
+                            of
+                            {{ total_count }}
+                            analyses.
+                        </p>
+
+                    {% else %}
+
+                        <p>
+                            No persisted analyses are
+                            available yet.
+                        </p>
+
+                    {% endif %}
 
                 </div>
 
             </div>
 
 
-            {% if recent_analyses %}
+            {% if analyses %}
 
                 <div class="table-wrapper">
 
-                    <table class="analysis-table">
+                    <table class="analysis-table analyses-table">
 
                         <thead>
 
                             <tr>
                                 <th>Source</th>
+                                <th>Type</th>
                                 <th>Events</th>
                                 <th>Incidents</th>
                                 <th>Ignored</th>
@@ -208,13 +215,13 @@
 
                         <tbody>
 
-                            {% for analysis in recent_analyses %}
+                            {% for analysis in analyses %}
 
                                 <tr>
 
                                     <td>
 
-                                        <div class="source-cell">
+                                        <div class="analysis-source">
 
                                             <strong>
                                                 {{
@@ -224,11 +231,23 @@
                                                 }}
                                             </strong>
 
-                                            <span>
-                                                {{ analysis.source_type }}
+                                            <span class="analysis-record-id">
+                                                {{ analysis.id }}
                                             </span>
 
                                         </div>
+
+                                    </td>
+
+
+                                    <td>
+
+                                        <span
+                                            class="source-type-badge
+                                            source-type-{{ analysis.source_type }}"
+                                        >
+                                            {{ analysis.source_type }}
+                                        </span>
 
                                     </td>
 
@@ -248,7 +267,9 @@
 
                                         {% else %}
 
-                                            0
+                                            <span class="zero-value">
+                                                0
+                                            </span>
 
                                         {% endif %}
 
@@ -260,12 +281,14 @@
                                     </td>
 
 
-                                    <td>
+                                    <td class="analysis-date">
+
                                         {{
                                             analysis.created_at.strftime(
                                                 "%Y-%m-%d %H:%M"
                                             )
                                         }}
+
                                     </td>
 
 
@@ -290,22 +313,76 @@
 
                 </div>
 
-            {% else %}
 
-                <div class="empty-state">
+                <div class="pagination">
 
-                    <div class="empty-state-icon">
-                        ◇
+                    <div class="pagination-summary">
+
+                        Page
+                        <strong>{{ page }}</strong>
+                        of
+                        <strong>{{ total_pages }}</strong>
+
                     </div>
 
-                    <h3>
+
+                    <div class="pagination-actions">
+
+                        {% if has_previous %}
+
+                            <a
+                                class="pagination-button"
+                                href="/dashboard/analyses?page={{ page - 1 }}&page_size={{ page_size }}"
+                            >
+                                ← Previous
+                            </a>
+
+                        {% else %}
+
+                            <span
+                                class="pagination-button disabled"
+                            >
+                                ← Previous
+                            </span>
+
+                        {% endif %}
+
+
+                        {% if has_next %}
+
+                            <a
+                                class="pagination-button"
+                                href="/dashboard/analyses?page={{ page + 1 }}&page_size={{ page_size }}"
+                            >
+                                Next →
+                            </a>
+
+                        {% else %}
+
+                            <span
+                                class="pagination-button disabled"
+                            >
+                                Next →
+                            </span>
+
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+            {% else %}
+
+                <div class="section-empty">
+
+                    <strong>
                         No analyses yet
-                    </h3>
+                    </strong>
 
                     <p>
-                        Run an authentication-log analysis
-                        and it will appear here for
-                        investigation.
+                        Submit an authentication log
+                        through the analysis API and it
+                        will appear here automatically.
                     </p>
 
                 </div>

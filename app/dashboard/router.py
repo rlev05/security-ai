@@ -1,6 +1,6 @@
 from _collections_abc import Callable
 from typing import Annotated, Any
-from fastapi import APIRouter, Request, Depends, Form, HTTPException, status
+from fastapi import APIRouter, Request, Depends, Form, HTTPException, status, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -11,7 +11,7 @@ from app.models.case import CaseSeverity
 from app.models.investigation_report import InvestigationReportStatus
 from app.models.user import UserRole
 from app.models.user_record import UserRecord
-from app.services.analysis_history_service import get_analysis_record, list_analysis_records
+from app.services.analysis_history_service import get_analysis_record, list_analysis_records, count_analysis_records
 from app.services.anomaly_run_service import get_latest_anomaly_run, load_anomaly_result, save_anomaly_run
 from app.services.case_service import create_case, get_case, get_case_analyses, link_analysis_to_case, list_cases, assign_case, list_case_notes, list_case_timeline, CaseStatus, add_case_note, set_case_status, set_case_severity
 from app.services.dashboard_service import get_dashboard_metrics
@@ -500,6 +500,91 @@ def root() -> RedirectResponse:
         status_code=(
             status.HTTP_303_SEE_OTHER
         ),
+    )
+
+@router.get(
+    "/dashboard/analyses",
+    response_class=HTMLResponse
+)
+
+def dashboard_analyses(
+    request: Request,
+        session: DatabaseSession,
+        page: Annotated[int, Query(ge=1)] = 1,
+        page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> Response:
+    user = _get_dashboard_user(request, session)
+
+    if user is None:
+        return RedirectResponse(
+            url="/login",
+            status_code=(status.HTTP_303_SEE_OTHER),
+        )
+
+    owner_user_id = (_owner_filter(user))
+
+    total_count = (
+        count_analysis_records(
+            session,
+            owner_user_id=owner_user_id,
+        )
+    )
+
+    total_pages = max(
+        1,
+        (
+            total_count + page_size - 1
+        )
+        // page_size,
+    )
+
+    if (total_count > 0 and page > total_pages):
+        return RedirectResponse(
+            url=(f"/dashboard/analyses?page={total_pages}&page_size={page_size}"),
+            status_code=(status.HTTP_303_SEE_OTHER),
+        )
+
+    offset = (
+        page - 1
+    ) * page_size
+
+    analyses = list_analysis_records(
+        session,
+        owner_user_id=owner_user_id,
+        limit=page_size,
+        offset=offset,
+    )
+
+    if total_count == 0:
+        first_record_number = 0
+        last_record_number = 0
+    else:
+        first_record_number = (
+            offset + 1
+        )
+
+        last_record_number = min(
+            offset
+            + len(analyses),
+            total_count,
+        )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="analyses.html",
+        context={
+            "page_title": ("Security Analyses"),
+            "current_user": user,
+            "analyses": analyses,
+            "page": page,
+            "page_size": page_size,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "first_record_number": (first_record_number),
+            "last_record_number": (last_record_number),
+            "has_previous": (page > 1),
+            "has_next": (page < total_pages and total_count > 0),
+        },
     )
 
 

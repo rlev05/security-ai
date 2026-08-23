@@ -42,7 +42,7 @@
             </a>
 
             <a
-                href="/dashboard"
+                href="/dashboard/analyses"
                 class="navigation-item"
             >
                 Analyses
@@ -126,6 +126,7 @@
 
             </article>
 
+
             <article class="metric-card">
 
                 <span class="metric-label">
@@ -137,6 +138,7 @@
                 </strong>
 
             </article>
+
 
             <article class="metric-card">
 
@@ -210,6 +212,7 @@
 
                                     </div>
 
+
                                     {% if case.description %}
 
                                         <p>
@@ -217,6 +220,7 @@
                                         </p>
 
                                     {% endif %}
+
 
                                     <div class="case-meta">
 
@@ -228,6 +232,7 @@
                                                 )
                                             }}
                                         </span>
+
 
                                         {% if case.assigned_to_user_id %}
 
@@ -246,6 +251,7 @@
                                     </div>
 
                                 </div>
+
 
                                 <span
                                     class="case-status-badge status-{{ case.status }}"
@@ -301,6 +307,7 @@
 
                 </div>
 
+
                 <form
                     class="standalone-case-form"
                     method="post"
@@ -319,6 +326,7 @@
                         required
                     >
 
+
                     <label for="description">
                         Description
                     </label>
@@ -329,6 +337,7 @@
                         maxlength="10000"
                         rows="6"
                     ></textarea>
+
 
                     <label for="severity">
                         Severity
@@ -359,6 +368,7 @@
                         </option>
 
                     </select>
+
 
                     <button
                         type="submit"

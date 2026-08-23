@@ -1,0 +1,127 @@
+.analyses-metrics {
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+}
+
+.analyses-table td {
+    vertical-align: middle;
+}
+
+.analysis-source {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 210px;
+}
+
+.analysis-source strong {
+    color: #e5e7eb;
+    font-size: 14px;
+}
+
+.analysis-record-id {
+    color: #64748b;
+    font-family:
+        "SFMono-Regular",
+        Consolas,
+        "Liberation Mono",
+        monospace;
+    font-size: 9px;
+}
+
+.source-type-badge {
+    border: 1px solid #334155;
+    border-radius: 999px;
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 5px 8px;
+    text-transform: uppercase;
+}
+
+.source-type-text {
+    background: #17202b;
+    color: #cbd5e1;
+}
+
+.source-type-file {
+    background: #182b2c;
+    border-color: #28514e;
+    color: #5eead4;
+}
+
+.zero-value {
+    color: #64748b;
+}
+
+.analysis-date {
+    color: #94a3b8;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.pagination {
+    align-items: center;
+    border-top: 1px solid #222d3a;
+    display: flex;
+    gap: 20px;
+    justify-content: space-between;
+    padding: 17px 20px;
+}
+
+.pagination-summary {
+    color: #64748b;
+    font-size: 12px;
+}
+
+.pagination-summary strong {
+    color: #cbd5e1;
+}
+
+.pagination-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.pagination-button {
+    background: #17202b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    color: #cbd5e1;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 8px 11px;
+}
+
+.pagination-button:hover {
+    background: #1f2b38;
+    border-color: #475569;
+    color: #f8fafc;
+}
+
+.pagination-button.disabled {
+    cursor: default;
+    opacity: 0.4;
+}
+
+@media (max-width: 900px) {
+    .analyses-metrics {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 700px) {
+    .pagination {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .pagination-actions {
+        width: 100%;
+    }
+
+    .pagination-button {
+        flex: 1;
+        text-align: center;
+    }
+}
