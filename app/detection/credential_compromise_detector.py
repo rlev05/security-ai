@@ -18,19 +18,13 @@ def detect_success_after_failures(
     """
 
     if failure_threshold < 1:
-        raise ValueError(
-            "Failure threshold must be at least 1"
-        )
+        raise ValueError("Failure threshold must be at least 1")
 
     if failure_window <= timedelta(0):
-        raise ValueError(
-            "Failure window must be greater than zero"
-        )
+        raise ValueError("Failure window must be greater than zero")
 
     if success_window <= timedelta(0):
-        raise ValueError(
-            "Success window must be greater than zero"
-        )
+        raise ValueError("Success window must be greater than zero")
 
     events_by_target: dict[
         tuple[str, str],
@@ -59,8 +53,7 @@ def detect_success_after_failures(
                 recent_failures.append(event)
 
                 while (
-                    recent_failures[-1].timestamp
-                    - recent_failures[0].timestamp
+                    recent_failures[-1].timestamp - recent_failures[0].timestamp
                     > failure_window
                 ):
                     recent_failures.popleft()
@@ -73,10 +66,7 @@ def detect_success_after_failures(
             if len(recent_failures) < failure_threshold:
                 continue
 
-            time_since_last_failure = (
-                event.timestamp
-                - recent_failures[-1].timestamp
-            )
+            time_since_last_failure = event.timestamp - recent_failures[-1].timestamp
 
             if time_since_last_failure > success_window:
                 continue
@@ -87,13 +77,9 @@ def detect_success_after_failures(
                 event,
             ]
 
-            failure_window_minutes = int(
-                failure_window.total_seconds() // 60
-            )
+            failure_window_minutes = int(failure_window.total_seconds() // 60)
 
-            success_window_minutes = int(
-                success_window.total_seconds() // 60
-            )
+            success_window_minutes = int(success_window.total_seconds() // 60)
 
             alert = Alert(
                 rule_id="AUTH-SUCCESS-AFTER-FAILURES-001",
@@ -112,10 +98,7 @@ def detect_success_after_failures(
                 mitre_tactic="Initial Access",
                 mitre_technique_id="T1078",
                 mitre_technique_name="Valid Accounts",
-                evidence=[
-                    matching_event.raw_log
-                    for matching_event in matching_events
-                ],
+                evidence=[matching_event.raw_log for matching_event in matching_events],
             )
 
             incidents.append(

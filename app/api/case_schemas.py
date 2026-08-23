@@ -1,7 +1,10 @@
 from datetime import datetime
 from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
-from app.models.case import CaseStatus, CaseSeverity
+
+from app.models.case import CaseSeverity, CaseStatus
+
 
 class CaseCreateRequest(BaseModel):
     model_config = ConfigDict(
@@ -18,9 +21,7 @@ class CaseCreateRequest(BaseModel):
         max_length=10_000,
     )
 
-    severity: CaseSeverity = (
-        CaseSeverity.MEDIUM
-    )
+    severity: CaseSeverity = CaseSeverity.MEDIUM
 
     assigned_to_user_id: str | None = None
 
@@ -138,23 +139,9 @@ class CaseTimelineEventResponse(BaseModel):
     created_at: datetime
 
 
-class CaseDetailResponse(
-    CaseResponse
-):
-    analyses: list[
-        CaseAnalysisResponse
-    ] = Field(
-        default_factory=list
-    )
+class CaseDetailResponse(CaseResponse):
+    analyses: list[CaseAnalysisResponse] = Field(default_factory=list)
 
-    notes: list[
-        CaseNoteResponse
-    ] = Field(
-        default_factory=list
-    )
+    notes: list[CaseNoteResponse] = Field(default_factory=list)
 
-    timeline: list[
-        CaseTimelineEventResponse
-    ] = Field(
-        default_factory=list
-    )
+    timeline: list[CaseTimelineEventResponse] = Field(default_factory=list)

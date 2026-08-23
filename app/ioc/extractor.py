@@ -1,13 +1,10 @@
 import ipaddress
 import re
 from typing import Any
+
 from app.ioc.schemas import Indicator, IndicatorType
 
-IPV4_PATTERN = re.compile(
-    r"(?<![\d.])"
-    r"(?:\d{1,3}\.){3}\d{1,3}"
-    r"(?![\d.])"
-)
+IPV4_PATTERN = re.compile(r"(?<![\d.])" r"(?:\d{1,3}\.){3}\d{1,3}" r"(?![\d.])")
 
 DOMAIN_PATTERN = re.compile(
     r"(?<![@A-Za-z0-9_-])"
@@ -20,17 +17,11 @@ DOMAIN_PATTERN = re.compile(
     r"(?![A-Za-z0-9_-])"
 )
 
-SHA256_PATTERN = re.compile(
-    r"(?<![A-Fa-f0-9])[A-Fa-f0-9]{64}(?![A-Fa-f0-9])"
-)
+SHA256_PATTERN = re.compile(r"(?<![A-Fa-f0-9])[A-Fa-f0-9]{64}(?![A-Fa-f0-9])")
 
-SHA1_PATTERN = re.compile(
-    r"(?<![A-Fa-f0-9])[A-Fa-f0-9]{40}(?![A-Fa-f0-9])"
-)
+SHA1_PATTERN = re.compile(r"(?<![A-Fa-f0-9])[A-Fa-f0-9]{40}(?![A-Fa-f0-9])")
 
-MD5_PATTERN = re.compile(
-    r"(?<![A-Fa-f0-9])[A-Fa-f0-9]{32}(?![A-Fa-f0-9])"
-)
+MD5_PATTERN = re.compile(r"(?<![A-Fa-f0-9])[A-Fa-f0-9]{32}(?![A-Fa-f0-9])")
 
 
 IP_FIELD_NAMES = {
@@ -44,7 +35,7 @@ IP_FIELD_NAMES = {
 
 
 def normalise_ip(
-        value: str,
+    value: str,
 ) -> str | None:
     try:
         return str(ipaddress.ip_address(value.strip()))
@@ -64,9 +55,7 @@ def add_indicator(
     normalised_value = value.strip()
 
     if indicator_type == IndicatorType.IP_ADDRESS:
-        parsed_ip = normalise_ip(
-            normalised_value
-        )
+        parsed_ip = normalise_ip(normalised_value)
 
         if parsed_ip is None:
             return
@@ -74,24 +63,16 @@ def add_indicator(
         normalised_value = parsed_ip
 
     elif indicator_type == IndicatorType.DOMAIN:
-        normalised_value = (
-            normalised_value
-            .rstrip(".")
-            .lower()
-        )
+        normalised_value = normalised_value.rstrip(".").lower()
 
         try:
-            ipaddress.ip_address(
-                normalised_value
-            )
+            ipaddress.ip_address(normalised_value)
             return
         except ValueError:
             pass
 
     else:
-        normalised_value = (
-            normalised_value.lower()
-        )
+        normalised_value = normalised_value.lower()
 
     key = (
         indicator_type,
@@ -105,60 +86,50 @@ def add_indicator(
 
 
 def extract_from_text(
-        text: str,
-        indicators: dict[
-            tuple[IndicatorType, str],
-            Indicator,
-        ],
+    text: str,
+    indicators: dict[
+        tuple[IndicatorType, str],
+        Indicator,
+    ],
 ) -> None:
     for match in IPV4_PATTERN.finditer(text):
         add_indicator(
             indicators,
-            indicator_type=(
-                IndicatorType.IP_ADDRESS
-            ),
+            indicator_type=(IndicatorType.IP_ADDRESS),
             value=match.group(0),
         )
 
     for match in SHA256_PATTERN.finditer(text):
         add_indicator(
             indicators,
-            indicator_type=(
-                IndicatorType.SHA256
-            ),
+            indicator_type=(IndicatorType.SHA256),
             value=match.group(0),
         )
 
     for match in SHA1_PATTERN.finditer(text):
         add_indicator(
             indicators,
-            indicator_type=(
-                IndicatorType.SHA1
-            ),
+            indicator_type=(IndicatorType.SHA1),
             value=match.group(0),
         )
 
     for match in MD5_PATTERN.finditer(text):
         add_indicator(
             indicators,
-            indicator_type=(
-                IndicatorType.MD5
-            ),
+            indicator_type=(IndicatorType.MD5),
             value=match.group(0),
         )
 
     for match in DOMAIN_PATTERN.finditer(text):
         add_indicator(
             indicators,
-            indicator_type=(
-                IndicatorType.DOMAIN
-            ),
+            indicator_type=(IndicatorType.DOMAIN),
             value=match.group(0),
         )
 
 
 def extract_indicators(
-        value: Any,
+    value: Any,
 ) -> list[Indicator]:
     """Extract supported indicators from analysis data"""
 
@@ -168,21 +139,16 @@ def extract_indicators(
     ] = {}
 
     def visit(
-            current: Any,
-            *,
-            parent_key: str | None = None,
+        current: Any,
+        *,
+        parent_key: str | None = None,
     ) -> None:
         if isinstance(current, dict):
             for key, child in current.items():
-                if (
-                    isinstance(child, str)
-                    and key in IP_FIELD_NAMES
-                ):
+                if isinstance(child, str) and key in IP_FIELD_NAMES:
                     add_indicator(
                         indicators,
-                        indicator_type=(
-                            IndicatorType.IP_ADDRESS
-                        ),
+                        indicator_type=(IndicatorType.IP_ADDRESS),
                         value=child,
                     )
                 visit(child, parent_key=key)
@@ -206,10 +172,3 @@ def extract_indicators(
             indicator.value,
         ),
     )
-
-
-
-
-
-
-

@@ -1,20 +1,22 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Boolean, DateTime, String, func, true, Column
+
+from sqlalchemy import Boolean, DateTime, String, func, true
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.database import Base
 from app.models.user import UserRole
 
 
 def generate_user_id() -> str:
     """Generate a user id for a user account"""
-    
+
     return str(uuid.uuid4())
 
 
 class UserRecord(Base):
     __tablename__ = "users"
-    
+
     id: Mapped[str] = mapped_column(
         String(36),
         primary_key=True,
@@ -59,4 +61,3 @@ class UserRecord(Base):
         nullable=False,
         server_default=func.now(),
     )
-

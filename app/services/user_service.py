@@ -1,6 +1,7 @@
 from sqlalchemy import or_, select
-from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
 from app.models.user import UserRole
 from app.models.user_record import UserRecord
 from app.services.security_service import hash_pashword, verify_password
@@ -8,6 +9,7 @@ from app.services.security_service import hash_pashword, verify_password
 
 class UserAlreadyExistsError(ValueError):
     """Raised when the user is already registered"""
+
 
 def normalise_email(email: str) -> str:
     """Prepare an email address for storage and comparison"""
@@ -21,12 +23,12 @@ def normalise_username(username: str) -> str:
 
 
 def create_user(
-        session: Session,
-        *,
-        email: str,
-        username: str,
-        password: str,
-        role: UserRole = UserRole.USER,
+    session: Session,
+    *,
+    email: str,
+    username: str,
+    password: str,
+    role: UserRole = UserRole.USER,
 ) -> UserRecord:
     """Create and store a user account"""
 
@@ -48,9 +50,7 @@ def create_user(
                 "A user with this email address already exists."
             )
 
-        raise UserAlreadyExistsError(
-            "A user with this email address already exists."
-        )
+        raise UserAlreadyExistsError("A user with this email address already exists.")
 
     user = UserRecord(
         email=normalised_email,
@@ -77,8 +77,8 @@ def create_user(
 
 
 def get_user_by_login(
-        session: Session,
-        login: str,
+    session: Session,
+    login: str,
 ) -> UserRecord | None:
     """Find a user by email address or username"""
 
@@ -93,11 +93,12 @@ def get_user_by_login(
 
     return session.scalar(statement)
 
+
 def authenticate_user(
-        session: Session,
-        *,
-        login: str,
-        password: str,
+    session: Session,
+    *,
+    login: str,
+    password: str,
 ) -> UserRecord | None:
     """Check login details"""
 
@@ -116,5 +117,3 @@ def authenticate_user(
         return None
 
     return user
-
-

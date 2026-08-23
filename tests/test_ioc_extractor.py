@@ -17,7 +17,7 @@ def test_extracts_supported_indicators() -> None:
                     f"{sha256} "
                     f"{sha1} "
                     f"{md5}"
-                )
+                ),
             }
         ]
     }
@@ -68,9 +68,7 @@ def test_extracts_supported_indicators() -> None:
 def test_deduplicates_indicators() -> None:
     result = {
         "source_ip": "8.8.8.8",
-        "raw_log": (
-            "8.8.8.8 repeated 8.8.8.8"
-        ),
+        "raw_log": ("8.8.8.8 repeated 8.8.8.8"),
     }
 
     indicators = extract_indicators(result)
@@ -83,30 +81,26 @@ def test_deduplicates_indicators() -> None:
 
     assert len(matching) == 1
 
+
 def test_invalid_ip_is_not_extracted() -> None:
     result = {
         "source_ip": "999.999.999.999",
     }
 
-    indicators = extract_indicators(
-        result
-    )
+    indicators = extract_indicators(result)
 
     assert indicators == []
 
 
 def test_private_ip_is_still_extracted() -> None:
-    result = {
-        "source_ip": "192.168.1.10"
-    }
+    result = {"source_ip": "192.168.1.10"}
 
-    indicators = extract_indicators(
-        result
+    indicators = extract_indicators(result)
+
+    assert (
+        Indicator(
+            type=IndicatorType.IP_ADDRESS,
+            value="192.168.1.10",
+        )
+        in indicators
     )
-
-
-    assert Indicator(
-        type=IndicatorType.IP_ADDRESS,
-        value="192.168.1.10",
-    ) in indicators
-

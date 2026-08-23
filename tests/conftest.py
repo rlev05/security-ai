@@ -1,5 +1,5 @@
-from collections.abc import Iterator
 import uuid
+from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,12 +13,17 @@ from app.main import app
 # Import all SQLAlchemy models so they are registered with Base.metadata
 # before create_all() runs.
 from app.models.analysis_record import AnalysisRecord
+from app.models.case_record import (
+    CaseAnalysisLink,
+    CaseNoteRecord,
+    CaseRecord,
+    CaseTimelineEventRecord,
+)
 from app.models.investigation_report_record import (
     InvestigationReportRecord,
 )  # noqa: F401
-from app.models.user_record import UserRecord
 from app.models.threat_intel_record import ThreatIntelEnrichmentRecord
-from app.models.case_record import CaseRecord, CaseTimelineEventRecord, CaseNoteRecord, CaseAnalysisLink
+from app.models.user_record import UserRecord
 
 TEST_ENGINE = create_engine(
     "sqlite://",
@@ -48,9 +53,7 @@ def client() -> Iterator[TestClient]:
         with TestingSessionLocal() as session:
             yield session
 
-    app.dependency_overrides[
-        get_database_session
-    ] = override_database_session
+    app.dependency_overrides[get_database_session] = override_database_session
 
     test_client = TestClient(app)
 
@@ -79,12 +82,8 @@ def analysis_client(
     identifier = uuid.uuid4().hex
 
     registration_payload = {
-        "email": (
-            f"analysis_{identifier}@example.com"
-        ),
-        "username": (
-            f"analysis_{identifier}"
-        ),
+        "email": (f"analysis_{identifier}@example.com"),
+        "username": (f"analysis_{identifier}"),
         "password": "StrongPassword123!",
     }
 
@@ -93,36 +92,21 @@ def analysis_client(
         json=registration_payload,
     )
 
-    assert (
-        registration_response.status_code
-        == 201
-    )
+    assert registration_response.status_code == 201
 
     token_response = client.post(
         "/auth/token",
         data={
-            "username": (
-                registration_payload["username"]
-            ),
-            "password": (
-                registration_payload["password"]
-            ),
+            "username": (registration_payload["username"]),
+            "password": (registration_payload["password"]),
         },
     )
 
     assert token_response.status_code == 200
 
-    access_token = token_response.json()[
-        "access_token"
-    ]
+    access_token = token_response.json()["access_token"]
 
-    client.headers.update(
-        {
-            "Authorization": (
-                f"Bearer {access_token}"
-            )
-        }
-    )
+    client.headers.update({"Authorization": (f"Bearer {access_token}")})
 
     return client
 

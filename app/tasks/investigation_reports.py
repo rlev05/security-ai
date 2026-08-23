@@ -1,43 +1,39 @@
 import logging
+
 from app.ai.dependencies import get_ai_provider
 from app.core.celery_app import celery_app
+from app.core.config import get_settings
 from app.core.database import SessionLocal
+from app.intel.dependencies import get_threat_intel_provider
 from app.knowledge.dependencies import get_attack_repository
 from app.models.investigation_report import InvestigationReportStatus
 from app.models.investigation_report_record import InvestigationReportRecord
-from app.services.investigation_report_service import fail_report, process_investigation_report
-from app.core.config import get_settings
-from app.intel.dependencies import get_threat_intel_provider
+from app.services.investigation_report_service import (
+    fail_report,
+    process_investigation_report,
+)
 
 logger = logging.getLogger(__name__)
+
 
 @celery_app.task(
     name="security_ai.generate_investigation_report",
 )
 def generate_investigation_report_task(
-        report_id: str,
+    report_id: str,
 ) -> None:
     """Generate one persisted AI investigation report."""
 
     session = SessionLocal()
 
     try:
-        report = session.get(
-            InvestigationReportRecord,
-            report_id
-        )
+        report = session.get(InvestigationReportRecord, report_id)
 
         if report is None:
-            logger.warning(
-                "Investigation report %s no longer exists.",
-                report_id
-            )
+            logger.warning("Investigation report %s no longer exists.", report_id)
             return
 
-        if (
-            report.status
-            != InvestigationReportStatus.PENDING.value
-        ):
+        if report.status != InvestigationReportStatus.PENDING.value:
             logger.info(
                 "Investigation report %s is already %s",
                 report_id,
@@ -57,16 +53,13 @@ def generate_investigation_report_task(
             provider=provider,
             repository=repository,
             threat_intel_provider=threat_intel_provider,
-            threat_intel_cache_ttl_hours=settings.threat_intel_cache_ttl_hours
+            threat_intel_cache_ttl_hours=settings.threat_intel_cache_ttl_hours,
         )
 
     except Exception:
         session.rollback()
 
-        report = session.get(
-            InvestigationReportRecord,
-            report_id
-        )
+        report = session.get(InvestigationReportRecord, report_id)
 
         if (
             report is not None
@@ -77,24 +70,19 @@ def generate_investigation_report_task(
                     session,
                     record=report,
                     error_message=(
-                        "The background investigation job "
-                        "failed unexpectedly."
+                        "The background investigation job " "failed unexpectedly."
                     ),
                 )
             except Exception:
                 logger.exception(
-                    "Could not persist failure status for "
-                    "investigation report %s.",
+                    "Could not persist failure status for " "investigation report %s.",
                     report_id,
                 )
         logger.exception(
-            "Unexpected failure while processing "
-            "investigation report %s.",
+            "Unexpected failure while processing " "investigation report %s.",
             report_id,
         )
 
         raise
     finally:
         session.close()
-
-

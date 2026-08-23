@@ -1,10 +1,12 @@
 from enum import StrEnum
 
+
 class CaseSeverity(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
+
 
 class CaseStatus(StrEnum):
     OPEN = "open"
@@ -13,6 +15,7 @@ class CaseStatus(StrEnum):
     RESOLVED = "resolved"
     CLOSED = "closed"
 
+
 class CaseTimelineEventType(StrEnum):
     CASE_CREATED = "case_created"
     ANALYSIS_LINKED = "analysis_linked"
@@ -20,4 +23,3 @@ class CaseTimelineEventType(StrEnum):
     ASSIGNEE_CHANGED = "assignee_changed"
     STATUS_CHANGED = "status_changed"
     SEVERITY_CHANGED = "severity_changed"
-

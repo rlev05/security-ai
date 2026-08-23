@@ -1,7 +1,9 @@
 from datetime import datetime, timezone
 from uuid import uuid4
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
+
 from app.ai.schemas import AnomalyEvidenceContext
 from app.anomaly.schemas import AnomalyDetectionResult, EventAnomaly
 from app.core.database import Base
@@ -12,25 +14,14 @@ from app.services.anomaly_run_service import save_anomaly_run
 from app.services.investigation_report_service import build_anomaly_evidence_context
 
 
-
 def build_database(
     tmp_path,
 ) -> sessionmaker[Session]:
-    database_path = (
-        tmp_path
-        / "ai-anomaly-evidence.db"
-    )
+    database_path = tmp_path / "ai-anomaly-evidence.db"
 
-    engine = create_engine(
-        (
-            "sqlite:///"
-            f"{database_path}"
-        )
-    )
+    engine = create_engine("sqlite:///" f"{database_path}")
 
-    Base.metadata.create_all(
-        engine
-    )
+    Base.metadata.create_all(engine)
 
     return sessionmaker(
         bind=engine,
@@ -43,12 +34,8 @@ def create_user(
 ) -> UserRecord:
     user = UserRecord(
         id=str(uuid4()),
-        email=(
-            f"{uuid4().hex}@example.com"
-        ),
-        username=(
-            f"ai_ml_{uuid4().hex[:8]}"
-        ),
+        email=(f"{uuid4().hex}@example.com"),
+        username=(f"ai_ml_{uuid4().hex[:8]}"),
         password_hash="test-hash",
         role="user",
         is_active=True,
@@ -122,16 +109,10 @@ def create_anomaly_result(
                     "distinct_users_for_ip": 8.0,
                 },
                 event={
-                    "timestamp": (
-                        "2026-08-20T03:00:00+00:00"
-                    ),
-                    "source_ip": (
-                        "203.0.113.250"
-                    ),
+                    "timestamp": ("2026-08-20T03:00:00+00:00"),
+                    "source_ip": ("203.0.113.250"),
                     "username": "target0",
-                    "event_type": (
-                        "LOGIN_FAILURE"
-                    ),
+                    "event_type": ("LOGIN_FAILURE"),
                 },
             )
         ],
@@ -142,25 +123,19 @@ def create_anomaly_result(
 def test_empty_anomaly_context_when_no_run_exists(
     tmp_path,
 ):
-    SessionLocal = build_database(
-        tmp_path
-    )
+    SessionLocal = build_database(tmp_path)
 
     with SessionLocal() as session:
-        user = create_user(
-            session
-        )
+        user = create_user(session)
 
         analysis = create_analysis(
             session,
             owner_user_id=user.id,
         )
 
-        context = (
-            build_anomaly_evidence_context(
-                session,
-                analysis_id=analysis.id,
-            )
+        context = build_anomaly_evidence_context(
+            session,
+            analysis_id=analysis.id,
         )
 
         assert isinstance(
@@ -176,14 +151,10 @@ def test_empty_anomaly_context_when_no_run_exists(
 def test_latest_persisted_anomaly_run_becomes_ai_evidence(
     tmp_path,
 ):
-    SessionLocal = build_database(
-        tmp_path
-    )
+    SessionLocal = build_database(tmp_path)
 
     with SessionLocal() as session:
-        user = create_user(
-            session
-        )
+        user = create_user(session)
 
         analysis = create_analysis(
             session,
@@ -230,59 +201,31 @@ def test_latest_persisted_anomaly_run_becomes_ai_evidence(
 
         session.commit()
 
-        context = (
-            build_anomaly_evidence_context(
-                session,
-                analysis_id=analysis.id,
-            )
+        context = build_anomaly_evidence_context(
+            session,
+            analysis_id=analysis.id,
         )
 
-        assert (
-            context.run_id
-            == second.id
-        )
+        assert context.run_id == second.id
 
-        assert (
-            context.result
-            is not None
-        )
+        assert context.result is not None
 
-        assert (
-            context.result.model_name
-            == "IsolationForest"
-        )
+        assert context.result.model_name == "IsolationForest"
 
-        assert (
-            context.result.anomaly_count
-            == 1
-        )
+        assert context.result.anomaly_count == 1
 
-        assert (
-            context.result
-            .anomalies[0]
-            .anomaly_score
-            == 0.97
-        )
+        assert context.result.anomalies[0].anomaly_score == 0.97
 
-        assert (
-            context.result
-            .anomalies[0]
-            .event["source_ip"]
-            == "203.0.113.250"
-        )
+        assert context.result.anomalies[0].event["source_ip"] == "203.0.113.250"
 
 
 def test_anomaly_context_serialises_for_ai_provider(
     tmp_path,
 ):
-    SessionLocal = build_database(
-        tmp_path
-    )
+    SessionLocal = build_database(tmp_path)
 
     with SessionLocal() as session:
-        user = create_user(
-            session
-        )
+        user = create_user(session)
 
         analysis = create_analysis(
             session,
@@ -296,31 +239,15 @@ def test_anomaly_context_serialises_for_ai_provider(
             result=create_anomaly_result(),
         )
 
-        context = (
-            build_anomaly_evidence_context(
-                session,
-                analysis_id=analysis.id,
-            )
+        context = build_anomaly_evidence_context(
+            session,
+            analysis_id=analysis.id,
         )
 
-        payload = context.model_dump(
-            mode="json"
-        )
+        payload = context.model_dump(mode="json")
 
-        assert (
-            payload["run_id"]
-            == saved.id
-        )
+        assert payload["run_id"] == saved.id
 
-        assert (
-            payload["result"][
-                "model_name"
-            ]
-            == "IsolationForest"
-        )
+        assert payload["result"]["model_name"] == "IsolationForest"
 
-        assert (
-            payload["result"][
-                "anomalies"
-            ][0]["reasons"]
-        )
+        assert payload["result"]["anomalies"][0]["reasons"]

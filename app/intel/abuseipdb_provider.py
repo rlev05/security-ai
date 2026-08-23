@@ -1,8 +1,12 @@
 from typing import Any
+
 import httpx
 from pydantic import ValidationError
-from app.intel.provider import ThreatIntelProviderResponseError, ThreatIntelProviderUnavailableError, \
-    ThreatIntelProvider
+
+from app.intel.provider import (
+    ThreatIntelProviderResponseError,
+    ThreatIntelProviderUnavailableError,
+)
 from app.intel.schemas import IPReputation
 from app.ioc.schemas import Indicator, IndicatorType
 
@@ -11,12 +15,12 @@ class AbuseIPDBProvider:
     provider_name = "abuseipdb"
 
     def __init__(
-            self,
-            *,
-            api_key: str,
-            base_url: str,
-            timeout_seconds: float,
-            max_age_days: int,
+        self,
+        *,
+        api_key: str,
+        base_url: str,
+        timeout_seconds: float,
+        max_age_days: int,
     ) -> None:
         self.api_key = api_key
         self.max_age_days = max_age_days
@@ -29,15 +33,13 @@ class AbuseIPDBProvider:
             },
         )
 
-    def supports(self,
-                 indicator_type: IndicatorType) -> bool:
-        return (
-            indicator_type
-            == IndicatorType.IP_ADDRESS
-        )
+    def supports(self, indicator_type: IndicatorType) -> bool:
+        return indicator_type == IndicatorType.IP_ADDRESS
 
-    def enrich(self,
-               indicator: Indicator,) -> IPReputation:
+    def enrich(
+        self,
+        indicator: Indicator,
+    ) -> IPReputation:
         if not self.supports(indicator.type):
             raise ThreatIntelProviderUnavailableError(
                 "AbuseIPDB only supports IP address indicators."
@@ -71,9 +73,7 @@ class AbuseIPDBProvider:
                 data,
                 dict,
             ):
-                raise TypeError(
-                    "data must be an object"
-                )
+                raise TypeError("data must be an object")
 
             return IPReputation(
                 ip_address=str(
@@ -88,36 +88,15 @@ class AbuseIPDBProvider:
                         0,
                     )
                 ),
-                is_public=data.get(
-                    "isPublic"
-                ),
-                ip_version=data.get(
-                    "ipVersion"
-                ),
-                is_whitelisted=data.get(
-                    "isWhitelisted"
-                ),
-                country_code=data.get(
-                    "countryCode"
-                ),
-                usage_type=data.get(
-                    "usageType"
-                ),
-                isp=data.get(
-                    "isp"
-                ),
-                domain=data.get(
-                    "domain"
-                ),
-                hostnames=(
-                    data.get(
-                        "hostnames"
-                    )
-                    or []
-                ),
-                is_tor=data.get(
-                    "isTor"
-                ),
+                is_public=data.get("isPublic"),
+                ip_version=data.get("ipVersion"),
+                is_whitelisted=data.get("isWhitelisted"),
+                country_code=data.get("countryCode"),
+                usage_type=data.get("usageType"),
+                isp=data.get("isp"),
+                domain=data.get("domain"),
+                hostnames=(data.get("hostnames") or []),
+                is_tor=data.get("isTor"),
                 total_reports=int(
                     data.get(
                         "totalReports",
@@ -130,11 +109,8 @@ class AbuseIPDBProvider:
                         0,
                     )
                 ),
-                last_reported_at=data.get(
-                    "lastReportedAt"
-                ),
+                last_reported_at=data.get("lastReportedAt"),
             )
-
 
         except (
             KeyError,

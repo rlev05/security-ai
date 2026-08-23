@@ -2,6 +2,7 @@ from app.intel.provider import ThreatIntelProviderUnavailableError
 from app.intel.schemas import IPReputation
 from app.ioc.schemas import Indicator, IndicatorType
 
+
 class FakeThreatIntelProvider:
     provider_name = "fake-intel"
 
@@ -9,16 +10,14 @@ class FakeThreatIntelProvider:
         self.call_count = 0
         self.queried_values: list[str] = []
 
+    def supports(
+        self,
+        indicator_type: IndicatorType,
+    ) -> bool:
 
-    def supports(self,
-                 indicator_type: IndicatorType,) -> bool:
+        return indicator_type == IndicatorType.IP_ADDRESS
 
-        return(
-            indicator_type == IndicatorType.IP_ADDRESS
-        )
-
-    def enrich(self,
-               indicator: Indicator) -> IPReputation:
+    def enrich(self, indicator: Indicator) -> IPReputation:
         self.call_count += 1
 
         self.queried_values.append(indicator.value)
@@ -40,12 +39,12 @@ class FakeThreatIntelProvider:
             last_reported_at=None,
         )
 
+
 class FailingThreatIntelProvider(FakeThreatIntelProvider):
 
     provider_name = "failing-intel"
 
-    def enrich(self,
-               indicator: Indicator) -> IPReputation:
+    def enrich(self, indicator: Indicator) -> IPReputation:
 
         self.call_count += 1
 

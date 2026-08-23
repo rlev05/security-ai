@@ -1,17 +1,19 @@
 from typing import Any
+
 import sklearn
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import RobustScaler
+
 from app.anomaly.features import FEATURE_NAMES, build_event_features
 from app.anomaly.schemas import AnomalyDetectionResult, EventAnomaly
-
 
 DEFAULT_CONTAMINATION = 0.05
 MINIMUM_EVENTS = 20
 RANDOM_STATE = 42
 
+
 def _build_reason_list(
-        features: dict[str, float],
+    features: dict[str, float],
 ) -> list[str]:
     reasons: list[str] = []
 
@@ -39,7 +41,7 @@ def _build_reason_list(
 
 
 def _normalise_anomaly_scores(
-        raw_scores: list[float],
+    raw_scores: list[float],
 ) -> list[float]:
     if not raw_scores:
         return []
@@ -55,9 +57,9 @@ def _normalise_anomaly_scores(
 
 
 def detect_event_anomalies(
-        events: list[dict[str, Any]],
-        *,
-        contamination: float = DEFAULT_CONTAMINATION,
+    events: list[dict[str, Any]],
+    *,
+    contamination: float = DEFAULT_CONTAMINATION,
 ) -> AnomalyDetectionResult:
     """
     Detect behavioural anomalies in security events using Isolation Forest.
@@ -152,4 +154,3 @@ def detect_event_anomalies(
         anomalies=anomalies,
         skipped_reason=None,
     )
-

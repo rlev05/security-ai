@@ -32,7 +32,6 @@ from app.services.analysis_history_service import (
 )
 from app.services.analysis_service import analyse_auth_log
 
-
 router = APIRouter(
     prefix="/analysis",
     tags=["analysis"],
@@ -168,9 +167,7 @@ async def analyse_authentication_log_file(
                 detail="Only .log and .txt files are supported.",
             )
 
-        file_bytes = await file.read(
-            MAX_UPLOAD_BYTES + 1
-        )
+        file_bytes = await file.read(MAX_UPLOAD_BYTES + 1)
 
         if len(file_bytes) > MAX_UPLOAD_BYTES:
             raise HTTPException(
@@ -183,9 +180,7 @@ async def analyse_authentication_log_file(
         except UnicodeDecodeError as error:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                detail=(
-                    "Uploaded file must contain valid UTF-8 text."
-                ),
+                detail=("Uploaded file must contain valid UTF-8 text."),
             ) from error
 
         result = run_analysis(content)
@@ -234,15 +229,10 @@ def get_analysis_history(
         session,
         limit=limit,
         offset=offset,
-        owner_user_id=get_analysis_owner_filter(
-            current_user
-        ),
+        owner_user_id=get_analysis_owner_filter(current_user),
     )
 
-    return [
-        create_history_summary(record)
-        for record in records
-    ]
+    return [create_history_summary(record) for record in records]
 
 
 @router.get(
@@ -260,9 +250,7 @@ def get_analysis_history_record(
     record = get_analysis_record(
         session,
         analysis_id,
-        owner_user_id=get_analysis_owner_filter(
-            current_user
-        ),
+        owner_user_id=get_analysis_owner_filter(current_user),
     )
 
     if record is None:
@@ -275,7 +263,5 @@ def get_analysis_history_record(
 
     return AnalysisHistoryResponse(
         **summary.model_dump(),
-        result=AnalysisResponse.model_validate(
-            record.result_json
-        ),
+        result=AnalysisResponse.model_validate(record.result_json),
     )

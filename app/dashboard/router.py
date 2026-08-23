@@ -1,9 +1,11 @@
 from _collections_abc import Callable
 from typing import Annotated, Any
-from fastapi import APIRouter, Request, Depends, Form, HTTPException, status, Query
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+
 from app.anomaly.detector import DEFAULT_CONTAMINATION, detect_event_anomalies
 from app.core.config import get_settings
 from app.core.database import get_database_session
@@ -11,11 +13,36 @@ from app.models.case import CaseSeverity
 from app.models.investigation_report import InvestigationReportStatus
 from app.models.user import UserRole
 from app.models.user_record import UserRecord
-from app.services.analysis_history_service import get_analysis_record, list_analysis_records, count_analysis_records
-from app.services.anomaly_run_service import get_latest_anomaly_run, load_anomaly_result, save_anomaly_run
-from app.services.case_service import create_case, get_case, get_case_analyses, link_analysis_to_case, list_cases, assign_case, list_case_notes, list_case_timeline, CaseStatus, add_case_note, set_case_status, set_case_severity
+from app.services.analysis_history_service import (
+    count_analysis_records,
+    get_analysis_record,
+    list_analysis_records,
+)
+from app.services.anomaly_run_service import (
+    get_latest_anomaly_run,
+    load_anomaly_result,
+    save_anomaly_run,
+)
+from app.services.case_service import (
+    CaseStatus,
+    add_case_note,
+    assign_case,
+    create_case,
+    get_case,
+    get_case_analyses,
+    link_analysis_to_case,
+    list_case_notes,
+    list_case_timeline,
+    list_cases,
+    set_case_severity,
+    set_case_status,
+)
 from app.services.dashboard_service import get_dashboard_metrics
-from app.services.investigation_report_service import get_latest_investigation_report, fail_report, create_pending_report
+from app.services.investigation_report_service import (
+    create_pending_report,
+    fail_report,
+    get_latest_investigation_report,
+)
 from app.services.security_service import create_access_token, decode_access_token
 from app.services.user_service import authenticate_user
 from app.tasks.dependencies import get_report_enqueuer
@@ -28,9 +55,7 @@ templates = Jinja2Templates(
     directory="app/templates",
 )
 
-DASHBOARD_COOKIE_NAME = (
-    "security_ai_session"
-)
+DASHBOARD_COOKIE_NAME = "security_ai_session"
 
 DatabaseSession = Annotated[
     Session,
@@ -46,10 +71,7 @@ ReportEnqueuer = Annotated[
 def _is_admin(
     user: UserRecord,
 ) -> bool:
-    return (
-        user.role
-        == UserRole.ADMIN.value
-    )
+    return user.role == UserRole.ADMIN.value
 
 
 def _owner_filter(
@@ -65,17 +87,13 @@ def _get_dashboard_user(
     request: Request,
     session: Session,
 ) -> UserRecord | None:
-    token = request.cookies.get(
-        DASHBOARD_COOKIE_NAME
-    )
+    token = request.cookies.get(DASHBOARD_COOKIE_NAME)
 
     if token is None:
         return None
 
     try:
-        user_id = decode_access_token(
-            token
-        )
+        user_id = decode_access_token(token)
     except ValueError:
         return None
 
@@ -84,10 +102,7 @@ def _get_dashboard_user(
         user_id,
     )
 
-    if (
-        user is None
-        or not user.is_active
-    ):
+    if user is None or not user.is_active:
         return None
 
     return user
@@ -104,9 +119,7 @@ def _require_dashboard_user(
 
     if user is None:
         raise HTTPException(
-            status_code=(
-                status.HTTP_401_UNAUTHORIZED
-            ),
+            status_code=(status.HTTP_401_UNAUTHORIZED),
             detail="Dashboard authentication required",
         )
 
@@ -122,16 +135,12 @@ def _get_visible_analysis(
     analysis = get_analysis_record(
         session,
         analysis_id,
-        owner_user_id=(
-            _owner_filter(user)
-        ),
+        owner_user_id=(_owner_filter(user)),
     )
 
     if analysis is None:
         raise HTTPException(
-            status_code=(
-                status.HTTP_404_NOT_FOUND
-            ),
+            status_code=(status.HTTP_404_NOT_FOUND),
             detail="Analysis not found",
         )
 
@@ -153,9 +162,7 @@ def _get_visible_case(
 
     if case_record is None:
         raise HTTPException(
-            status_code=(
-                status.HTTP_404_NOT_FOUND
-            ),
+            status_code=(status.HTTP_404_NOT_FOUND),
             detail="Case not found",
         )
 
@@ -189,18 +196,12 @@ def _find_nested_events(
         dict,
     ):
         if "events" in value:
-            events = (
-                _normalise_event_list(
-                    value["events"]
-                )
-            )
+            events = _normalise_event_list(value["events"])
 
             if events:
                 return events
 
-        for nested_value in (
-            value.values()
-        ):
+        for nested_value in value.values():
             if not isinstance(
                 nested_value,
                 (
@@ -210,11 +211,7 @@ def _find_nested_events(
             ):
                 continue
 
-            events = (
-                _find_nested_events(
-                    nested_value
-                )
-            )
+            events = _find_nested_events(nested_value)
 
             if events:
                 return events
@@ -233,11 +230,7 @@ def _find_nested_events(
             ):
                 continue
 
-            events = (
-                _find_nested_events(
-                    item
-                )
-            )
+            events = _find_nested_events(item)
 
             if events:
                 return events
@@ -248,9 +241,7 @@ def _find_nested_events(
 def _extract_events(
     result_json: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    return _find_nested_events(
-        result_json
-    )
+    return _find_nested_events(result_json)
 
 
 def _get_result_list(
@@ -292,20 +283,12 @@ def _get_case_groups(
             case_id=case_record.id,
         )
 
-        linked = any(
-            analysis.id
-            == analysis_id
-            for analysis in analyses
-        )
+        linked = any(analysis.id == analysis_id for analysis in analyses)
 
         if linked:
-            linked_cases.append(
-                case_record
-            )
+            linked_cases.append(case_record)
         else:
-            available_cases.append(
-                case_record
-            )
+            available_cases.append(case_record)
 
     return (
         linked_cases,
@@ -330,9 +313,7 @@ def _build_workspace_context(
         else {}
     )
 
-    events = _extract_events(
-        result_json
-    )
+    events = _extract_events(result_json)
 
     incidents = _get_result_list(
         result_json,
@@ -347,17 +328,11 @@ def _build_workspace_context(
     anomaly_result = None
 
     if anomaly_run is not None:
-        anomaly_result = (
-            load_anomaly_result(
-                anomaly_run
-            )
-        )
+        anomaly_result = load_anomaly_result(anomaly_run)
 
-    investigation_report = (
-        get_latest_investigation_report(
-            session,
-            analysis_id=analysis.id,
-        )
+    investigation_report = get_latest_investigation_report(
+        session,
+        analysis_id=analysis.id,
     )
 
     (
@@ -376,19 +351,11 @@ def _build_workspace_context(
         "incidents": incidents,
         "anomaly_run": anomaly_run,
         "anomaly_result": anomaly_result,
-        "investigation_report": (
-            investigation_report
-        ),
+        "investigation_report": (investigation_report),
         "linked_cases": linked_cases,
-        "available_cases": (
-            available_cases
-        ),
-        "action_message": (
-            action_message
-        ),
-        "action_error": (
-            action_error
-        ),
+        "available_cases": (available_cases),
+        "action_message": (action_message),
+        "action_error": (action_error),
     }
 
 
@@ -411,10 +378,7 @@ def _render_workspace_content(
 
     return templates.TemplateResponse(
         request=request,
-        name=(
-            "partials/"
-            "workspace_content.html"
-        ),
+        name=("partials/" "workspace_content.html"),
         context=context,
     )
 
@@ -448,18 +412,10 @@ def _build_case_context(
         "analyses": analyses,
         "notes": notes,
         "timeline": timeline,
-        "case_statuses": list(
-            CaseStatus
-        ),
-        "case_severities": list(
-            CaseSeverity
-        ),
-        "action_message": (
-            action_message
-        ),
-        "action_error": (
-            action_error
-        ),
+        "case_statuses": list(CaseStatus),
+        "case_severities": list(CaseSeverity),
+        "action_message": (action_message),
+        "action_error": (action_error),
     }
 
 
@@ -482,10 +438,7 @@ def _render_case_content(
 
     return templates.TemplateResponse(
         request=request,
-        name=(
-            "partials/"
-            "case_detail_content.html"
-        ),
+        name=("partials/" "case_detail_content.html"),
         context=context,
     )
 
@@ -497,21 +450,16 @@ def _render_case_content(
 def root() -> RedirectResponse:
     return RedirectResponse(
         url="/dashboard",
-        status_code=(
-            status.HTTP_303_SEE_OTHER
-        ),
+        status_code=(status.HTTP_303_SEE_OTHER),
     )
 
-@router.get(
-    "/dashboard/analyses",
-    response_class=HTMLResponse
-)
 
+@router.get("/dashboard/analyses", response_class=HTMLResponse)
 def dashboard_analyses(
     request: Request,
-        session: DatabaseSession,
-        page: Annotated[int, Query(ge=1)] = 1,
-        page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    session: DatabaseSession,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> Response:
     user = _get_dashboard_user(request, session)
 
@@ -521,32 +469,25 @@ def dashboard_analyses(
             status_code=(status.HTTP_303_SEE_OTHER),
         )
 
-    owner_user_id = (_owner_filter(user))
+    owner_user_id = _owner_filter(user)
 
-    total_count = (
-        count_analysis_records(
-            session,
-            owner_user_id=owner_user_id,
-        )
+    total_count = count_analysis_records(
+        session,
+        owner_user_id=owner_user_id,
     )
 
     total_pages = max(
         1,
-        (
-            total_count + page_size - 1
-        )
-        // page_size,
+        (total_count + page_size - 1) // page_size,
     )
 
-    if (total_count > 0 and page > total_pages):
+    if total_count > 0 and page > total_pages:
         return RedirectResponse(
             url=(f"/dashboard/analyses?page={total_pages}&page_size={page_size}"),
             status_code=(status.HTTP_303_SEE_OTHER),
         )
 
-    offset = (
-        page - 1
-    ) * page_size
+    offset = (page - 1) * page_size
 
     analyses = list_analysis_records(
         session,
@@ -559,13 +500,10 @@ def dashboard_analyses(
         first_record_number = 0
         last_record_number = 0
     else:
-        first_record_number = (
-            offset + 1
-        )
+        first_record_number = offset + 1
 
         last_record_number = min(
-            offset
-            + len(analyses),
+            offset + len(analyses),
             total_count,
         )
 
@@ -604,18 +542,14 @@ def login_page(
     if user is not None:
         return RedirectResponse(
             url="/dashboard",
-            status_code=(
-                status.HTTP_303_SEE_OTHER
-            ),
+            status_code=(status.HTTP_303_SEE_OTHER),
         )
 
     return templates.TemplateResponse(
         request=request,
         name="login.html",
         context={
-            "page_title": (
-                "Security AI Login"
-            ),
+            "page_title": ("Security AI Login"),
             "error": None,
         },
     )
@@ -648,30 +582,19 @@ def login(
             request=request,
             name="login.html",
             context={
-                "page_title": (
-                    "Security AI Login"
-                ),
-                "error": (
-                    "Incorrect username, email, "
-                    "or password."
-                ),
+                "page_title": ("Security AI Login"),
+                "error": ("Incorrect username, email, " "or password."),
             },
-            status_code=(
-                status.HTTP_401_UNAUTHORIZED
-            ),
+            status_code=(status.HTTP_401_UNAUTHORIZED),
         )
 
-    token = create_access_token(
-        user.id
-    )
+    token = create_access_token(user.id)
 
     settings = get_settings()
 
     response = RedirectResponse(
         url="/dashboard",
-        status_code=(
-            status.HTTP_303_SEE_OTHER
-        ),
+        status_code=(status.HTTP_303_SEE_OTHER),
     )
 
     response.set_cookie(
@@ -680,11 +603,7 @@ def login(
         httponly=True,
         samesite="strict",
         secure=settings.dashboard_cookie_secure,
-        max_age=(
-            settings
-            .access_token_expire_minutes
-            * 60
-        ),
+        max_age=(settings.access_token_expire_minutes * 60),
         path="/",
     )
 
@@ -697,9 +616,7 @@ def login(
 def logout() -> RedirectResponse:
     response = RedirectResponse(
         url="/login",
-        status_code=(
-            status.HTTP_303_SEE_OTHER
-        ),
+        status_code=(status.HTTP_303_SEE_OTHER),
     )
 
     response.delete_cookie(
@@ -726,9 +643,7 @@ def dashboard(
     if user is None:
         return RedirectResponse(
             url="/login",
-            status_code=(
-                status.HTTP_303_SEE_OTHER
-            ),
+            status_code=(status.HTTP_303_SEE_OTHER),
         )
 
     metrics = get_dashboard_metrics(
@@ -736,27 +651,21 @@ def dashboard(
         owner_user_id=user.id,
     )
 
-    recent_analyses = (
-        list_analysis_records(
-            session,
-            owner_user_id=user.id,
-            limit=10,
-            offset=0,
-        )
+    recent_analyses = list_analysis_records(
+        session,
+        owner_user_id=user.id,
+        limit=10,
+        offset=0,
     )
 
     return templates.TemplateResponse(
         request=request,
         name="dashboard.html",
         context={
-            "page_title": (
-                "Security AI Dashboard"
-            ),
+            "page_title": ("Security AI Dashboard"),
             "current_user": user,
             "metrics": metrics,
-            "recent_analyses": (
-                recent_analyses
-            ),
+            "recent_analyses": (recent_analyses),
         },
     )
 
@@ -778,9 +687,7 @@ def analysis_workspace(
     if user is None:
         return RedirectResponse(
             url="/login",
-            status_code=(
-                status.HTTP_303_SEE_OTHER
-            ),
+            status_code=(status.HTTP_303_SEE_OTHER),
         )
 
     analysis = _get_visible_analysis(
@@ -795,9 +702,7 @@ def analysis_workspace(
         user=user,
     )
 
-    context["page_title"] = (
-        "Security Investigation"
-    )
+    context["page_title"] = "Security Investigation"
 
     return templates.TemplateResponse(
         request=request,
@@ -863,15 +768,11 @@ def dashboard_run_anomaly(
         else {}
     )
 
-    events = _extract_events(
-        result_json
-    )
+    events = _extract_events(result_json)
 
     result = detect_event_anomalies(
         events,
-        contamination=(
-            DEFAULT_CONTAMINATION
-        ),
+        contamination=(DEFAULT_CONTAMINATION),
     )
 
     save_anomaly_run(
@@ -886,10 +787,7 @@ def dashboard_run_anomaly(
         session,
         analysis=analysis,
         user=user,
-        action_message=(
-            "Anomaly detection completed "
-            "and the result was persisted."
-        ),
+        action_message=("Anomaly detection completed " "and the result was persisted."),
     )
 
 
@@ -914,27 +812,18 @@ def dashboard_generate_report(
         user=user,
     )
 
-    latest = (
-        get_latest_investigation_report(
-            session,
-            analysis_id=analysis.id,
-        )
+    latest = get_latest_investigation_report(
+        session,
+        analysis_id=analysis.id,
     )
 
-    if (
-        latest is not None
-        and latest.status
-        == InvestigationReportStatus.PENDING.value
-    ):
+    if latest is not None and latest.status == InvestigationReportStatus.PENDING.value:
         return _render_workspace_content(
             request,
             session,
             analysis=analysis,
             user=user,
-            action_message=(
-                "An AI investigation is "
-                "already queued."
-            ),
+            action_message=("An AI investigation is " "already queued."),
         )
 
     record = create_pending_report(
@@ -944,17 +833,13 @@ def dashboard_generate_report(
     )
 
     try:
-        enqueue_report(
-            record.id
-        )
+        enqueue_report(record.id)
     except Exception:
         fail_report(
             session,
             record=record,
             error_message=(
-                "The investigation could "
-                "not be queued for "
-                "background processing."
+                "The investigation could " "not be queued for " "background processing."
             ),
         )
 
@@ -963,10 +848,7 @@ def dashboard_generate_report(
             session,
             analysis=analysis,
             user=user,
-            action_error=(
-                "The AI investigation "
-                "queue is unavailable."
-            ),
+            action_error=("The AI investigation " "queue is unavailable."),
         )
 
     return _render_workspace_content(
@@ -1019,10 +901,7 @@ def dashboard_link_case(
             session,
             analysis=analysis,
             user=user,
-            action_error=(
-                "The selected case could "
-                "not be found."
-            ),
+            action_error=("The selected case could " "not be found."),
         )
 
     link = link_analysis_to_case(
@@ -1038,10 +917,7 @@ def dashboard_link_case(
             session,
             analysis=analysis,
             user=user,
-            action_message=(
-                "This analysis is already "
-                "linked to that case."
-            ),
+            action_message=("This analysis is already " "linked to that case."),
         )
 
     return _render_workspace_content(
@@ -1049,10 +925,7 @@ def dashboard_link_case(
         session,
         analysis=analysis,
         user=user,
-        action_message=(
-            f"Analysis linked to case "
-            f"'{case_record.title}'."
-        ),
+        action_message=(f"Analysis linked to case " f"'{case_record.title}'."),
     )
 
 
@@ -1090,10 +963,7 @@ def dashboard_create_case(
     case_record = create_case(
         session,
         title=title,
-        description=(
-            "Created from security "
-            f"analysis {analysis.id}."
-        ),
+        description=("Created from security " f"analysis {analysis.id}."),
         severity=severity,
         created_by_user_id=user.id,
         assigned_to_user_id=None,
@@ -1111,10 +981,7 @@ def dashboard_create_case(
         session,
         analysis=analysis,
         user=user,
-        action_message=(
-            f"Case '{case_record.title}' "
-            "created and linked."
-        ),
+        action_message=(f"Case '{case_record.title}' " "created and linked."),
     )
 
 
@@ -1134,9 +1001,7 @@ def dashboard_cases(
     if user is None:
         return RedirectResponse(
             url="/login",
-            status_code=(
-                status.HTTP_303_SEE_OTHER
-            ),
+            status_code=(status.HTTP_303_SEE_OTHER),
         )
 
     records = list_cases(
@@ -1156,25 +1021,18 @@ def dashboard_cases(
     )
 
     critical_count = sum(
-        1
-        for record in records
-        if record.severity
-        == CaseSeverity.CRITICAL.value
+        1 for record in records if record.severity == CaseSeverity.CRITICAL.value
     )
 
     return templates.TemplateResponse(
         request=request,
         name="cases.html",
         context={
-            "page_title": (
-                "Security Cases"
-            ),
+            "page_title": ("Security Cases"),
             "current_user": user,
             "cases": records,
             "open_count": open_count,
-            "critical_count": (
-                critical_count
-            ),
+            "critical_count": (critical_count),
         },
     )
 
@@ -1211,16 +1069,10 @@ def dashboard_create_standalone_case(
     if user is None:
         return RedirectResponse(
             url="/login",
-            status_code=(
-                status.HTTP_303_SEE_OTHER
-            ),
+            status_code=(status.HTTP_303_SEE_OTHER),
         )
 
-    clean_description = (
-        description.strip()
-        if description
-        else None
-    )
+    clean_description = description.strip() if description else None
 
     case_record = create_case(
         session,
@@ -1232,13 +1084,8 @@ def dashboard_create_standalone_case(
     )
 
     return RedirectResponse(
-        url=(
-            f"/dashboard/cases/"
-            f"{case_record.id}"
-        ),
-        status_code=(
-            status.HTTP_303_SEE_OTHER
-        ),
+        url=(f"/dashboard/cases/" f"{case_record.id}"),
+        status_code=(status.HTTP_303_SEE_OTHER),
     )
 
 
@@ -1259,9 +1106,7 @@ def dashboard_case_detail(
     if user is None:
         return RedirectResponse(
             url="/login",
-            status_code=(
-                status.HTTP_303_SEE_OTHER
-            ),
+            status_code=(status.HTTP_303_SEE_OTHER),
         )
 
     case_record = _get_visible_case(
@@ -1276,9 +1121,7 @@ def dashboard_case_detail(
         user=user,
     )
 
-    context["page_title"] = (
-        case_record.title
-    )
+    context["page_title"] = case_record.title
 
     return templates.TemplateResponse(
         request=request,
@@ -1354,9 +1197,7 @@ def dashboard_add_case_note(
         session,
         case_record=case_record,
         user=user,
-        action_message=(
-            "Analyst note added."
-        ),
+        action_message=("Analyst note added."),
     )
 
 
@@ -1396,9 +1237,7 @@ def dashboard_update_case_status(
         session,
         case_record=case_record,
         user=user,
-        action_message=(
-            "Case status updated."
-        ),
+        action_message=("Case status updated."),
     )
 
 
@@ -1438,9 +1277,7 @@ def dashboard_update_case_severity(
         session,
         case_record=case_record,
         user=user,
-        action_message=(
-            "Case severity updated."
-        ),
+        action_message=("Case severity updated."),
     )
 
 
@@ -1476,9 +1313,7 @@ def dashboard_assign_case_to_self(
         session,
         case_record=case_record,
         user=user,
-        action_message=(
-            "Case assigned to you."
-        ),
+        action_message=("Case assigned to you."),
     )
 
 
@@ -1502,11 +1337,7 @@ def dashboard_unassign_case(
         user=user,
     )
 
-    can_unassign = (
-        _is_admin(user)
-        or case_record.created_by_user_id
-        == user.id
-    )
+    can_unassign = _is_admin(user) or case_record.created_by_user_id == user.id
 
     if not can_unassign:
         return _render_case_content(
@@ -1533,7 +1364,5 @@ def dashboard_unassign_case(
         session,
         case_record=case_record,
         user=user,
-        action_message=(
-            "Case assignment removed."
-        ),
+        action_message=("Case assignment removed."),
     )

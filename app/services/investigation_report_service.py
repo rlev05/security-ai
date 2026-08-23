@@ -1,10 +1,9 @@
 from datetime import datetime, timezone
 from typing import Any
 
-from app.ai.schemas import AnalysisEvidence, AnomalyEvidenceContext
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from app.services.anomaly_run_service import get_latest_anomaly_run, load_anomaly_result
+
 from app.ai.grounding import (
     validate_and_normalise_grounded_report,
 )
@@ -12,7 +11,16 @@ from app.ai.provider import (
     AIProviderError,
     InvestigationReportProvider,
 )
-from app.ai.schemas import AnalysisEvidence
+from app.ai.schemas import AnalysisEvidence, AnomalyEvidenceContext
+from app.intel.provider import (
+    ThreatIntelProvider,
+)
+from app.intel.schemas import (
+    ThreatIntelContext,
+)
+from app.ioc.extractor import (
+    extract_indicators,
+)
 from app.knowledge.attack_repository import (
     AttackKnowledgeRepository,
 )
@@ -23,25 +31,16 @@ from app.models.investigation_report import (
 from app.models.investigation_report_record import (
     InvestigationReportRecord,
 )
-
-from app.intel.provider import (
-    ThreatIntelProvider,
-)
-from app.intel.schemas import (
-    ThreatIntelContext,
-)
-from app.ioc.extractor import (
-    extract_indicators,
-)
+from app.services.anomaly_run_service import get_latest_anomaly_run, load_anomaly_result
 from app.services.threat_intel_service import (
     enrich_indicators,
 )
 
 
 def build_anomaly_evidence_context(
-        session: Session,
-        *,
-        analysis_id: str,
+    session: Session,
+    *,
+    analysis_id: str,
 ) -> AnomalyEvidenceContext:
     """
     Build AI-ready anomaly evidence from the latest persisted
@@ -51,10 +50,7 @@ def build_anomaly_evidence_context(
     anomaly model. Only previously persisted ML evidence is used.
     """
 
-    record = get_latest_anomaly_run(
-        session,
-        analysis_id=analysis_id
-    )
+    record = get_latest_anomaly_run(session, analysis_id=analysis_id)
 
     if record is None:
         return AnomalyEvidenceContext()
@@ -62,32 +58,22 @@ def build_anomaly_evidence_context(
     result = load_anomaly_result(record)
 
     return AnomalyEvidenceContext(
-        run_id=record.id,
-        created_at=record.created_at,
-        result=result
+        run_id=record.id, created_at=record.created_at, result=result
     )
+
 
 def build_analysis_evidence(
     analysis: AnalysisRecord,
     repository: AttackKnowledgeRepository,
-    threat_intel_context: (
-        ThreatIntelContext | None
-    ) = None,
-    anomaly_context: (
-        AnomalyEvidenceContext | None
-    ) = None,
+    threat_intel_context: ThreatIntelContext | None = None,
+    anomaly_context: AnomalyEvidenceContext | None = None,
 ) -> AnalysisEvidence:
     """Build AI evidence with trusted ATT&CK grounding."""
 
-    attack_context = (
-        repository.build_grounding_context(
-            analysis.result_json
-        )
-    )
+    attack_context = repository.build_grounding_context(analysis.result_json)
 
     if threat_intel_context is None:
         threat_intel_context = ThreatIntelContext()
-
 
     if anomaly_context is None:
         anomaly_context = AnomalyEvidenceContext()
@@ -101,7 +87,7 @@ def build_analysis_evidence(
         result=analysis.result_json,
         attack_context=attack_context,
         threat_intel_context=threat_intel_context,
-        anomaly_context=anomaly_context
+        anomaly_context=anomaly_context,
     )
 
 
@@ -164,9 +150,7 @@ def complete_report(
 ) -> InvestigationReportRecord:
     """Mark a report as successfully completed."""
 
-    record.status = (
-        InvestigationReportStatus.COMPLETED.value
-    )
+    record.status = InvestigationReportStatus.COMPLETED.value
 
     record.provider = provider_name
     record.model = model_name
@@ -177,9 +161,7 @@ def complete_report(
     record.anomaly_json = anomaly_json
     record.error_message = None
 
-    record.completed_at = datetime.now(
-        timezone.utc
-    )
+    record.completed_at = datetime.now(timezone.utc)
 
     try:
         session.commit()
@@ -199,17 +181,11 @@ def fail_report(
 ) -> InvestigationReportRecord:
     """Mark a report attempt as failed."""
 
-    record.status = (
-        InvestigationReportStatus.FAILED.value
-    )
+    record.status = InvestigationReportStatus.FAILED.value
 
-    record.error_message = (
-        error_message[:500]
-    )
+    record.error_message = error_message[:500]
 
-    record.completed_at = datetime.now(
-        timezone.utc
-    )
+    record.completed_at = datetime.now(timezone.utc)
 
     try:
         session.commit()
@@ -227,7 +203,7 @@ def process_investigation_report(
     report_id: str,
     provider: InvestigationReportProvider,
     repository: AttackKnowledgeRepository,
-    threat_intel_provider: (ThreatIntelProvider | None) = None,
+    threat_intel_provider: ThreatIntelProvider | None = None,
     threat_intel_cache_ttl_hours: int = 24,
 ) -> InvestigationReportRecord | None:
     """Process an already-created pending investigation report.
@@ -244,10 +220,7 @@ def process_investigation_report(
     if record is None:
         return None
 
-    if (
-        record.status
-        != InvestigationReportStatus.PENDING.value
-    ):
+    if record.status != InvestigationReportStatus.PENDING.value:
         return record
 
     analysis = session.get(
@@ -276,21 +249,14 @@ def process_investigation_report(
     if threat_intel_provider is not None:
         indicators = extract_indicators(analysis.result_json)
 
-        threat_intel_context = (
-            enrich_indicators(
-                session,
-                indicators=indicators,
-                provider=threat_intel_provider,
-                cache_ttl_hours=threat_intel_cache_ttl_hours,
-            )
+        threat_intel_context = enrich_indicators(
+            session,
+            indicators=indicators,
+            provider=threat_intel_provider,
+            cache_ttl_hours=threat_intel_cache_ttl_hours,
         )
 
-    anomaly_context = (
-        build_anomaly_evidence_context(
-            session,
-            analysis_id=analysis.id
-        )
-    )
+    anomaly_context = build_anomaly_evidence_context(session, analysis_id=analysis.id)
 
     evidence = build_analysis_evidence(
         analysis,
@@ -300,15 +266,11 @@ def process_investigation_report(
     )
 
     try:
-        generated = provider.generate_report(
-            evidence
-        )
+        generated = provider.generate_report(evidence)
 
-        grounded_report = (
-            validate_and_normalise_grounded_report(
-                generated.content,
-                evidence.attack_context,
-            )
+        grounded_report = validate_and_normalise_grounded_report(
+            generated.content,
+            evidence.attack_context,
         )
 
     except AIProviderError as exc:
@@ -325,24 +287,10 @@ def process_investigation_report(
         record=record,
         provider_name=generated.provider,
         model_name=generated.model,
-        report_json=(
-            grounded_report.model_dump(
-                mode="json"
-            )
-        ),
-        grounding_json=(
-            evidence.attack_context.model_dump(
-                mode="json"
-            )
-        ),
-        threat_intel_json=(
-            evidence
-            .threat_intel_context.model_dump(mode="json")
-        ),
-        anomaly_json=(
-            evidence
-            .anomaly_context.model_dump(mode="json")
-        ),
+        report_json=(grounded_report.model_dump(mode="json")),
+        grounding_json=(evidence.attack_context.model_dump(mode="json")),
+        threat_intel_json=(evidence.threat_intel_context.model_dump(mode="json")),
+        anomaly_json=(evidence.anomaly_context.model_dump(mode="json")),
     )
 
 
@@ -364,10 +312,7 @@ def get_latest_investigation_report(
 ) -> InvestigationReportRecord | None:
     statement = (
         select(InvestigationReportRecord)
-        .where(
-            InvestigationReportRecord.analysis_id
-            == analysis_id
-        )
+        .where(InvestigationReportRecord.analysis_id == analysis_id)
         .order_by(
             InvestigationReportRecord.created_at.desc(),
             InvestigationReportRecord.id.desc(),

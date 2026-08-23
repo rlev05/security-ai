@@ -1,9 +1,12 @@
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, JSON, String
+
+from sqlalchemy import JSON, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.database import Base
+
 
 def generate_uuid() -> str:
     return str(uuid4())
@@ -85,6 +88,3 @@ class AnomalyRunRecord(Base):
         nullable=False,
         index=True,
     )
-
-
-    

@@ -1,6 +1,5 @@
 from functools import lru_cache
 
-from sqlalchemy import false
 
 from app.core.config import get_settings
 from app.intel.abuseipdb_provider import AbuseIPDBProvider
@@ -12,39 +11,32 @@ from app.ioc.schemas import Indicator, IndicatorType
 class DisabledThreatIntelProvider:
     provider_name = "disabled"
 
-    def supports(self,
-                 indicator_type: IndicatorType,
-                 ) -> bool:
+    def supports(
+        self,
+        indicator_type: IndicatorType,
+    ) -> bool:
 
         return False
 
-    def enrich(self,
-               indicator: Indicator,
-               ) -> IPReputation:
+    def enrich(
+        self,
+        indicator: Indicator,
+    ) -> IPReputation:
         raise ThreatIntelProviderUnavailableError(
             "Threat-intelligence enrichment is disabled."
         )
 
 
 @lru_cache
-def get_threat_intel_provider() -> (
-    ThreatIntelProvider
-):
+def get_threat_intel_provider() -> ThreatIntelProvider:
 
     settings = get_settings()
 
-    if (
-        settings.threat_intel_provider == "abuseipdb"
-    ):
-        if (
-            settings.abuseipdb_api_key
-            is None
-        ):
+    if settings.threat_intel_provider == "abuseipdb":
+        if settings.abuseipdb_api_key is None:
             return DisabledThreatIntelProvider()
 
-        api_key = (
-            settings.abuseipdb_api_key.get_secret_value().strip()
-        )
+        api_key = settings.abuseipdb_api_key.get_secret_value().strip()
 
         if not api_key:
             return DisabledThreatIntelProvider()
@@ -57,6 +49,3 @@ def get_threat_intel_provider() -> (
         )
 
     return DisabledThreatIntelProvider()
-
-
-

@@ -1,7 +1,13 @@
 import json
-from openai import OpenAI, APIError
+
+from openai import APIError, OpenAI
 from pydantic import ValidationError
-from app.ai.provider import AIProviderResponseError, AIProviderUnavailableError, GeneratedInvestigationReport
+
+from app.ai.provider import (
+    AIProviderResponseError,
+    AIProviderUnavailableError,
+    GeneratedInvestigationReport,
+)
 from app.ai.schemas import AnalysisEvidence, InvestigationReportContent
 
 SYSTEM_INSTRUCTIONS = """
@@ -37,25 +43,22 @@ class OpenAIInvestigationProvider:
     provider_name = "openai"
 
     def __init__(
-            self,
-            *,
-            api_key: str,
-            model: str,
-            timeout_seconds: float,
-            max_input_characters: int,
+        self,
+        *,
+        api_key: str,
+        model: str,
+        timeout_seconds: float,
+        max_input_characters: int,
     ) -> None:
-        self.model.name = model
+        self.model_name = model
         self.max_input_characters = max_input_characters
 
-        self._client = OpenAI(
-            api_key=api_key,
-            timeout=timeout_seconds,
-            max_retries=2
-        )
+        self._client = OpenAI(api_key=api_key, timeout=timeout_seconds, max_retries=2)
 
-    def generate_report(self,
-                        evidence: AnalysisEvidence,
-                        ) -> GeneratedInvestigationReport:
+    def generate_report(
+        self,
+        evidence: AnalysisEvidence,
+    ) -> GeneratedInvestigationReport:
         context = json.dumps(
             evidence.model_dump(mode="json"),
             ensure_ascii=False,
@@ -65,7 +68,7 @@ class OpenAIInvestigationProvider:
         was_truncated = len(context) > self.max_input_characters
 
         if was_truncated:
-            context = context[:self.max_input_characters]
+            context = context[: self.max_input_characters]
 
         truncation_notice = (
             "The supplied evidence was truncated to the configured input "
@@ -124,4 +127,3 @@ class OpenAIInvestigationProvider:
             model=self.model_name,
             content=report,
         )
-

@@ -39,13 +39,14 @@ MONTH_NUMBERS = {
     "Dec": 12,
 }
 
+
 def create_security_event(
-        *,
-        timestamp: datetime,
-        result: str,
-        username: str,
-        source_ip: str,
-        raw_log: str,
+    *,
+    timestamp: datetime,
+    result: str,
+    username: str,
+    source_ip: str,
+    raw_log: str,
 ) -> SecurityEvent | None:
     """Validate parsed values and create SecurityEvent object"""
 
@@ -55,9 +56,7 @@ def create_security_event(
         return None
 
     event_type = (
-        EventType.LOGIN_FAILURE
-        if result == "Failed"
-        else EventType.LOGIN_SUCCESS
+        EventType.LOGIN_FAILURE if result == "Failed" else EventType.LOGIN_SUCCESS
     )
 
     return SecurityEvent(
@@ -68,10 +67,11 @@ def create_security_event(
         raw_log=raw_log,
     )
 
+
 def parse_iso_auth_log(
-        line: str,
+    line: str,
 ) -> SecurityEvent | None:
-    """ Parse the simplified ISO authentication log"""
+    """Parse the simplified ISO authentication log"""
 
     match = ISO_AUTH_LOG_PATTERN.search(line)
 
@@ -79,9 +79,7 @@ def parse_iso_auth_log(
         return None
 
     try:
-        timestamp = datetime.fromisoformat(
-            match.group("timestamp")
-        )
+        timestamp = datetime.fromisoformat(match.group("timestamp"))
     except ValueError:
         return None
 
@@ -93,11 +91,12 @@ def parse_iso_auth_log(
         raw_log=line,
     )
 
+
 def parse_openssh_auth_log(
-        line: str,
-        default_year: int,
+    line: str,
+    default_year: int,
 ) -> SecurityEvent | None:
-    """ Parse a standard OpenSSH authentication entry"""
+    """Parse a standard OpenSSH authentication entry"""
 
     match = OPENSSH_AUTH_LOG_PATTERN.search(line)
 
@@ -110,10 +109,7 @@ def parse_openssh_auth_log(
         return None
 
     try:
-        hour, minute, second = (
-            int(value)
-            for value in match.group("time").split(":")
-        )
+        hour, minute, second = (int(value) for value in match.group("time").split(":"))
 
         timestamp = datetime(
             year=default_year,
@@ -135,12 +131,10 @@ def parse_openssh_auth_log(
     )
 
 
-
 def parse_auth_log_line(
-        line: str,
-        default_year: int | None = None,
+    line: str,
+    default_year: int | None = None,
 ) -> SecurityEvent | None:
-
     """Convert an autheenticated log line into a SecurityEvent object."""
     cleaned_line = line.strip()
 
@@ -152,14 +146,9 @@ def parse_auth_log_line(
     if iso_event is not None:
         return iso_event
 
-    resolved_year = (
-        default_year
-        if default_year is not None
-        else datetime.now().year
-    )
+    resolved_year = default_year if default_year is not None else datetime.now().year
 
     return parse_openssh_auth_log(
         cleaned_line,
         resolved_year,
     )
-

@@ -1,10 +1,15 @@
 from collections.abc import Iterator
+
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
+
 from app.core.database import Base
-from app.services.analysis_history_service import get_analysis_record, save_analysis_result
+from app.services.analysis_history_service import (
+    get_analysis_record,
+    save_analysis_result,
+)
 from app.services.analysis_service import analyse_auth_log
 
 
@@ -30,6 +35,7 @@ def database_session() -> Iterator[Session]:
     Base.metadata.drop_all(bind=engine)
     engine.dispose()
 
+
 def create_analysis_result():
     content = """
     2026-08-01T12:00:00 Failed password for admin from 192.168.1.5
@@ -41,8 +47,9 @@ def create_analysis_result():
 
     return analyse_auth_log(content)
 
+
 def test_saves_complete_analysis_snapshot(
-        database_session: Session,
+    database_session: Session,
 ) -> None:
     result = create_analysis_result()
 
@@ -54,21 +61,20 @@ def test_saves_complete_analysis_snapshot(
     )
 
     assert record.id is not None
-    assert record.source_type =="file"
+    assert record.source_type == "file"
     assert record.source_name == "auth.log"
     assert record.total_lines == 5
     assert record.ignored_lines == 0
     assert record.event_count == 5
     assert record.incident_count == 1
 
-    stored_alert = (
-        record.result_json["incidents"][0]["alerts"][0]
-    )
+    stored_alert = record.result_json["incidents"][0]["alerts"][0]
 
-    assert (stored_alert["rule_id"] == "AUTH-BRUTE-FORCE-001")
+    assert stored_alert["rule_id"] == "AUTH-BRUTE-FORCE-001"
+
 
 def test_retrieves_analysis_by_identifier(
-        database_session: Session,
+    database_session: Session,
 ) -> None:
     result = create_analysis_result()
 
@@ -89,7 +95,7 @@ def test_retrieves_analysis_by_identifier(
 
 
 def test_rejects_unsupported_source_type(
-        database_session: Session,
+    database_session: Session,
 ) -> None:
     result = create_analysis_result()
 
@@ -102,5 +108,3 @@ def test_rejects_unsupported_source_type(
             result,
             source_type="unkown",
         )
-
-

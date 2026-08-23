@@ -1,18 +1,18 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
 from app.anomaly.schemas import AnomalyDetectionResult
 from app.models.anomaly_run_record import AnomalyRunRecord
 
+
 def save_anomaly_run(
-        session: Session,
-        *,
-        analysis_id: str,
-        requested_by_user_id: str | None,
-        result: AnomalyDetectionResult,
+    session: Session,
+    *,
+    analysis_id: str,
+    requested_by_user_id: str | None,
+    result: AnomalyDetectionResult,
 ) -> AnomalyRunRecord:
-
     """Persist the complete output of one anomaly detection run"""
-
 
     record = AnomalyRunRecord(
         analysis_id=analysis_id,
@@ -23,7 +23,7 @@ def save_anomaly_run(
         total_events=result.total_events,
         analysed_events=result.analysed_events,
         anomaly_count=result.anomaly_count,
-        result_json=result.model_dump(mode="json")
+        result_json=result.model_dump(mode="json"),
     )
 
     try:
@@ -37,59 +37,55 @@ def save_anomaly_run(
 
 
 def get_anomaly_run(
-        session: Session,
-        run_id: str,
-        *,
-        analysis_id: str,
-        requested_by_user_id: str | None,
+    session: Session,
+    run_id: str,
+    *,
+    analysis_id: str,
+    requested_by_user_id: str | None,
 ) -> AnomalyRunRecord | None:
-    statement = select(
-        AnomalyRunRecord
-    ).where(
-        AnomalyRunRecord.id == run_id
-    )
+    statement = select(AnomalyRunRecord).where(AnomalyRunRecord.id == run_id)
 
     return session.scalar(statement)
+
 
 def get_latest_anomaly_run(
-        session: Session,
-        *,
-        analysis_id: str,
+    session: Session,
+    *,
+    analysis_id: str,
 ) -> AnomalyRunRecord | None:
-    statement = select(
-        AnomalyRunRecord
-    ).where(
-        AnomalyRunRecord.analysis_id == analysis_id
-    ).order_by(AnomalyRunRecord.created_at.desc()).limit(1)
-
+    statement = (
+        select(AnomalyRunRecord)
+        .where(AnomalyRunRecord.analysis_id == analysis_id)
+        .order_by(AnomalyRunRecord.created_at.desc())
+        .limit(1)
+    )
 
     return session.scalar(statement)
 
+
 def list_anomaly_run(
-        session: Session,
-        *,
-        analysis_id: str,
-        limit: int = 20,
-        offset: int = 0,
+    session: Session,
+    *,
+    analysis_id: str,
+    limit: int = 20,
+    offset: int = 0,
 ) -> list[AnomalyRunRecord]:
-    statement = (select(
-        AnomalyRunRecord
-    ).where(
-        AnomalyRunRecord.analysis_id == analysis_id).order_by(
-        AnomalyRunRecord.created_at.desc()
-    )
+    statement = (
+        select(AnomalyRunRecord)
+        .where(AnomalyRunRecord.analysis_id == analysis_id)
+        .order_by(AnomalyRunRecord.created_at.desc())
         .offset(offset)
         .limit(limit)
     )
 
     return list(session.scalars(statement).all())
 
-def load_anomaly_result(
-        record: AnomalyRunRecord
-) -> AnomalyDetectionResult:
+
+def load_anomaly_result(record: AnomalyRunRecord) -> AnomalyDetectionResult:
     """Reconstruct validated API result from JSON"""
 
     return AnomalyDetectionResult.model_validate(record.result_json)
+
 
 def list_anomaly_runs(
     session: Session,
@@ -105,22 +101,10 @@ def list_anomaly_runs(
 
     statement = (
         select(AnomalyRunRecord)
-        .where(
-            AnomalyRunRecord.analysis_id
-            == analysis_id
-        )
-        .order_by(
-            AnomalyRunRecord.created_at.desc()
-        )
+        .where(AnomalyRunRecord.analysis_id == analysis_id)
+        .order_by(AnomalyRunRecord.created_at.desc())
         .offset(offset)
         .limit(limit)
     )
 
-    return list(
-        session.scalars(
-            statement
-        ).all()
-    )
-
-
-
+    return list(session.scalars(statement).all())

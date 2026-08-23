@@ -1,5 +1,7 @@
 from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict
+
 
 class IndicatorType(StrEnum):
     IP_ADDRESS = "ip_address"
@@ -7,6 +9,7 @@ class IndicatorType(StrEnum):
     MD5 = "md5"
     SHA1 = "sha1"
     SHA256 = "sha256"
+
 
 class Indicator(BaseModel):
     model_config = ConfigDict(
@@ -16,6 +19,3 @@ class Indicator(BaseModel):
 
     type: IndicatorType
     value: str
-
-
-

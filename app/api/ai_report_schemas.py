@@ -1,9 +1,12 @@
 from datetime import datetime
+
 from pydantic import BaseModel
+
 from app.ai.schemas import InvestigationReportContent
+from app.intel.schemas import ThreatIntelContext
 from app.knowledge.schemas import AttackGroundingContext
 from app.models.investigation_report_record import InvestigationReportStatus
-from app.intel.schemas import ThreatIntelContext
+
 
 class InvestigationReportResponse(BaseModel):
     report_id: str
@@ -18,6 +21,3 @@ class InvestigationReportResponse(BaseModel):
     created_at: datetime
     completed_at: datetime | None
     threat_intelligence: ThreatIntelContext | None
-
-
-

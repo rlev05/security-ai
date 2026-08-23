@@ -1,8 +1,8 @@
 from datetime import datetime
-from sys import deactivate_stack_trampoline
 
 from app.detection.auth_log_parser import parse_auth_log_line
 from app.models.event import EventType
+
 
 def test_parses_openssh_failed_password() -> None:
     line = (
@@ -17,14 +17,7 @@ def test_parses_openssh_failed_password() -> None:
     )
 
     assert event is not None
-    assert event.timestamp == datetime(
-        2026,
-        8,
-        2,
-        12,
-        30,
-        15
-    )
+    assert event.timestamp == datetime(2026, 8, 2, 12, 30, 15)
 
     assert event.source_ip == "192.168.1.5"
     assert event.username == "admin"
@@ -91,14 +84,8 @@ def test_rejects_openssh_log_with_invalid_ip() -> None:
     )
 
     event = parse_auth_log_line(
-        line, default_year=2026,
+        line,
+        default_year=2026,
     )
 
     assert event is None
-
-
-
-
-
-
-

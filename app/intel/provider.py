@@ -1,23 +1,18 @@
 from typing import Protocol
+
 from app.intel.schemas import IPReputation
 from app.ioc.schemas import Indicator, IndicatorType
 
 
-class ThreatIntelProviderError(
-    RuntimeError
-):
+class ThreatIntelProviderError(RuntimeError):
     """Base threat-intelligence provider error."""
 
 
-class ThreatIntelProviderUnavailableError(
-    ThreatIntelProviderError
-):
+class ThreatIntelProviderUnavailableError(ThreatIntelProviderError):
     """Provider could not be contacted."""
 
 
-class ThreatIntelProviderResponseError(
-    ThreatIntelProviderError
-):
+class ThreatIntelProviderResponseError(ThreatIntelProviderError):
     """Provider returned an invalid response."""
 
 
@@ -29,4 +24,3 @@ class ThreatIntelProvider(Protocol):
 
     def enrich(self, indicator: Indicator) -> IPReputation:
         """Enrich one security indicator."""
-

@@ -1,17 +1,19 @@
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
-from datetime import datetime
+
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
 )
+
 from app.anomaly.schemas import AnomalyDetectionResult
+from app.intel.schemas import ThreatIntelContext
 from app.knowledge.schemas import (
     AttackGroundingContext,
 )
 
-from app.intel.schemas import ThreatIntelContext
 
 class InvestigationRiskLevel(StrEnum):
     LOW = "low"
@@ -26,6 +28,7 @@ class EvidenceBasis(StrEnum):
     ATTACK_KNOWLEDGE = "attack_knowledge"
     THREAT_INTELLIGENCE = "threat_intelligence"
     AI_INFERENCE = "ai_inference"
+
 
 class AnomalyEvidenceContext(BaseModel):
     """
@@ -154,21 +157,15 @@ class InvestigationReportContent(BaseModel):
         default_factory=list,
     )
 
-    evidence_assessment: list[
-        EvidenceAssessment
-    ] = Field(
+    evidence_assessment: list[EvidenceAssessment] = Field(
         default_factory=list,
     )
 
-    mitre_assessment: list[
-        MitreAssessment
-    ] = Field(
+    mitre_assessment: list[MitreAssessment] = Field(
         default_factory=list,
     )
 
-    investigation_steps: list[
-        InvestigationStep
-    ] = Field(
+    investigation_steps: list[InvestigationStep] = Field(
         default_factory=list,
     )
 

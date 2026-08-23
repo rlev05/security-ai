@@ -1,7 +1,10 @@
 from datetime import datetime
 from typing import Any
+
 from pydantic import BaseModel, ConfigDict
+
 from app.anomaly.schemas import AnomalyRunResponse
+
 
 class WorkspaceAnalysis(BaseModel):
     model_config = ConfigDict(
@@ -55,6 +58,4 @@ class AnalysisWorkspaceResponse(BaseModel):
 
     latest_anomaly_run: AnomalyRunResponse | None = None
 
-    latest_investigation_report: (
-        WorkspaceInvestigationReport | None
-    ) = None
+    latest_investigation_report: WorkspaceInvestigationReport | None = None

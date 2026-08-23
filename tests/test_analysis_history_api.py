@@ -1,6 +1,5 @@
 from fastapi.testclient import TestClient
 
-
 BRUTE_FORCE_LOG = """
 2026-08-01T12:00:00 Failed password for admin from 192.168.1.5
 2026-08-01T12:01:00 Failed password for admin from 192.168.1.5
@@ -64,10 +63,7 @@ def test_lists_analysis_history(
 
     records = response.json()
 
-    record_ids = {
-        record["analysis_id"]
-        for record in records
-    }
+    record_ids = {record["analysis_id"] for record in records}
 
     assert first_id in record_ids
     assert second_id in record_ids

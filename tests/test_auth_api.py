@@ -1,7 +1,8 @@
 from fastapi.testclient import TestClient
 
+
 def build_user_payload(
-        identifier: str,
+    identifier: str,
 ) -> dict[str, str]:
     return {
         "email": f"{identifier}@example.com",
@@ -11,8 +12,8 @@ def build_user_payload(
 
 
 def register_user(
-        client: TestClient,
-        identifier: str,
+    client: TestClient,
+    identifier: str,
 ) -> dict[str, str]:
     payload = build_user_payload(identifier)
 
@@ -24,9 +25,12 @@ def register_user(
 
 
 def test_register_user(
-        client: TestClient,
+    client: TestClient,
 ) -> None:
-    response = client.post("/auth/register", json=build_user_payload("register_user"),)
+    response = client.post(
+        "/auth/register",
+        json=build_user_payload("register_user"),
+    )
 
     assert response.status_code == 201
 
@@ -41,7 +45,7 @@ def test_register_user(
 
 
 def test_registration_rejects_duplicate_email(
-        client: TestClient,
+    client: TestClient,
 ) -> None:
     first_payload = build_user_payload("duplicate_email")
 
@@ -59,7 +63,7 @@ def test_registration_rejects_duplicate_email(
 
 
 def test_registration_rejects_duplicate_username(
-        client: TestClient,
+    client: TestClient,
 ) -> None:
 
     first_payload = build_user_payload("duplicate_username")
@@ -78,7 +82,7 @@ def test_registration_rejects_duplicate_username(
 
 
 def test_user_can_log_in_with_email(
-        client: TestClient,
+    client: TestClient,
 ) -> None:
     payload = register_user(
         client,
@@ -106,7 +110,7 @@ def test_user_can_log_in_with_email(
 
 
 def test_user_can_log_in_with_username(
-        client: TestClient,
+    client: TestClient,
 ) -> None:
     payload = register_user(
         client,
@@ -124,13 +128,11 @@ def test_user_can_log_in_with_username(
     assert response.status_code == 200
     assert response.json()["access_token"]
 
+
 def test_login_rejects_incorrect_password(
-        client: TestClient,
+    client: TestClient,
 ) -> None:
-    payload = register_user(
-        client,
-        "incorrect_password"
-    )
+    payload = register_user(client, "incorrect_password")
 
     response = client.post(
         "/auth/token",
@@ -142,22 +144,23 @@ def test_login_rejects_incorrect_password(
 
     assert response.status_code == 401
 
+
 def test_login_rejects_unknown_user(
-        client: TestClient,
+    client: TestClient,
 ) -> None:
     response = client.post(
         "/auth/token",
         data={
             "username": "missing@example.com",
             "password": "StrongPassword123!",
-        }
+        },
     )
 
     assert response.status_code == 401
 
 
 def test_authenticated_user_can_read_profile(
-        client: TestClient,
+    client: TestClient,
 ) -> None:
     payload = register_user(
         client,
@@ -169,7 +172,7 @@ def test_authenticated_user_can_read_profile(
         data={
             "username": payload["username"],
             "password": payload["password"],
-        }
+        },
     )
 
     assert token_reponse.status_code == 200
@@ -193,23 +196,22 @@ def test_authenticated_user_can_read_profile(
 
 
 def test_profile_requires_authentication(
-        client: TestClient,
+    client: TestClient,
 ) -> None:
     response = client.get("/auth/me")
 
     assert response.status_code == 401
 
+
 def test_profile_rejects_invalid_token(
-        client: TestClient,
+    client: TestClient,
 ) -> None:
 
-    response = client.get("/auth/me",
-                          headers={
-                              "Authorization": "Bearer invalid-token",
-                          },
-                          )
+    response = client.get(
+        "/auth/me",
+        headers={
+            "Authorization": "Bearer invalid-token",
+        },
+    )
 
     assert response.status_code == 401
-
-
-

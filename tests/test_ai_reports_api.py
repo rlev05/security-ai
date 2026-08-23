@@ -9,7 +9,6 @@ from app.models.user import UserRole
 from app.models.user_record import UserRecord
 from app.tasks.dependencies import get_report_enqueuer
 
-
 AUTH_LOG_CONTENT = """
 2026-08-01T12:00:00 Failed password for admin from 192.168.1.5
 2026-08-01T12:01:00 Failed password for admin from 192.168.1.5
@@ -30,9 +29,7 @@ def queued_report_ids() -> list[str]:
     ) -> None:
         queued.append(report_id)
 
-    app.dependency_overrides[
-        get_report_enqueuer
-    ] = lambda: fake_enqueue
+    app.dependency_overrides[get_report_enqueuer] = lambda: fake_enqueue
 
     try:
         yield queued
@@ -74,9 +71,7 @@ def register_and_login(
 
     assert token_response.status_code == 200
 
-    access_token = token_response.json()[
-        "access_token"
-    ]
+    access_token = token_response.json()["access_token"]
 
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -137,10 +132,7 @@ def test_user_can_queue_ai_report(
 
     assert len(queued_report_ids) == 1
 
-    assert (
-        queued_report_ids[0]
-        == body["report_id"]
-    )
+    assert queued_report_ids[0] == body["report_id"]
 
 
 def test_pending_report_can_be_retrieved(
@@ -174,10 +166,7 @@ def test_pending_report_can_be_retrieved(
     creation_body = creation_response.json()
     retrieval_body = retrieval_response.json()
 
-    assert (
-        retrieval_body["report_id"]
-        == creation_body["report_id"]
-    )
+    assert retrieval_body["report_id"] == creation_body["report_id"]
 
     assert retrieval_body["status"] == "pending"
     assert retrieval_body["report"] is None
@@ -200,9 +189,7 @@ def test_ai_report_requires_authentication(
         headers,
     )
 
-    response = client.post(
-        f"/analysis/history/{analysis_id}/ai-report"
-    )
+    response = client.post(f"/analysis/history/{analysis_id}/ai-report")
 
     assert response.status_code == 401
 
@@ -258,30 +245,18 @@ def test_admin_can_queue_report_for_any_analysis(
     )
 
     admin_user = UserRecord(
-        id=str(
-            admin_response["id"]
-        ),
-        email=str(
-            admin_response["email"]
-        ),
-        username=str(
-            admin_response["username"]
-        ),
-        password_hash=(
-            "not-used-by-this-test"
-        ),
+        id=str(admin_response["id"]),
+        email=str(admin_response["email"]),
+        username=str(admin_response["username"]),
+        password_hash=("not-used-by-this-test"),
         role=UserRole.ADMIN.value,
         is_active=True,
     )
 
-    app.dependency_overrides[
-        get_current_user
-    ] = lambda: admin_user
+    app.dependency_overrides[get_current_user] = lambda: admin_user
 
     try:
-        response = client.post(
-            f"/analysis/history/{analysis_id}/ai-report"
-        )
+        response = client.post(f"/analysis/history/{analysis_id}/ai-report")
     finally:
         app.dependency_overrides.pop(
             get_current_user,
@@ -296,10 +271,7 @@ def test_admin_can_queue_report_for_any_analysis(
 
     assert len(queued_report_ids) == 1
 
-    assert (
-        queued_report_ids[0]
-        == body["report_id"]
-    )
+    assert queued_report_ids[0] == body["report_id"]
 
 
 def test_missing_report_returns_not_found(
@@ -332,13 +304,9 @@ def test_queue_failure_marks_report_failed(
     def broken_enqueue(
         report_id: str,
     ) -> None:
-        raise RuntimeError(
-            "Redis unavailable"
-        )
+        raise RuntimeError("Redis unavailable")
 
-    app.dependency_overrides[
-        get_report_enqueuer
-    ] = lambda: broken_enqueue
+    app.dependency_overrides[get_report_enqueuer] = lambda: broken_enqueue
 
     try:
         _, headers = register_and_login(
@@ -358,9 +326,7 @@ def test_queue_failure_marks_report_failed(
 
         assert response.status_code == 503
 
-        assert response.json()["detail"] == (
-            "The background job queue is unavailable."
-        )
+        assert response.json()["detail"] == ("The background job queue is unavailable.")
 
         retrieval_response = client.get(
             f"/analysis/history/{analysis_id}/ai-report",
@@ -381,8 +347,7 @@ def test_queue_failure_marks_report_failed(
     assert body["report"] is None
 
     assert body["error_message"] == (
-        "The investigation could not be queued "
-        "for background processing."
+        "The investigation could not be queued " "for background processing."
     )
 
 
@@ -413,13 +378,9 @@ def test_multiple_requests_create_separate_jobs(
     assert first_response.status_code == 202
     assert second_response.status_code == 202
 
-    first_id = first_response.json()[
-        "report_id"
-    ]
+    first_id = first_response.json()["report_id"]
 
-    second_id = second_response.json()[
-        "report_id"
-    ]
+    second_id = second_response.json()["report_id"]
 
     assert first_id != second_id
 

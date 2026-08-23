@@ -5,7 +5,6 @@ from app.main import app
 from app.models.user import UserRole
 from app.models.user_record import UserRecord
 
-
 AUTH_LOG_CONTENT = """
 2026-08-01T12:00:00 Failed password for admin from 192.168.1.5
 2026-08-01T12:01:00 Failed password for admin from 192.168.1.5
@@ -139,13 +138,11 @@ def test_users_only_list_their_own_analyses(
     assert second_history_response.status_code == 200
 
     first_history_ids = {
-        record["analysis_id"]
-        for record in first_history_response.json()
+        record["analysis_id"] for record in first_history_response.json()
     }
 
     second_history_ids = {
-        record["analysis_id"]
-        for record in second_history_response.json()
+        record["analysis_id"] for record in second_history_response.json()
     }
 
     assert first_analysis_id in first_history_ids
@@ -216,9 +213,7 @@ def test_admin_can_view_every_analysis(
         is_active=True,
     )
 
-    app.dependency_overrides[get_current_user] = (
-        lambda: admin_user
-    )
+    app.dependency_overrides[get_current_user] = lambda: admin_user
 
     try:
         history_response = client.get(
@@ -237,10 +232,7 @@ def test_admin_can_view_every_analysis(
     assert history_response.status_code == 200
     assert detail_response.status_code == 200
 
-    history_ids = {
-        record["analysis_id"]
-        for record in history_response.json()
-    }
+    history_ids = {record["analysis_id"] for record in history_response.json()}
 
     assert first_analysis_id in history_ids
     assert second_analysis_id in history_ids

@@ -1,12 +1,4 @@
 from uuid import uuid4
-from fastapi.testclient import TestClient
-from app.api.auth_dependencies import get_current_user
-from app.main import app
-from app.models.case import CaseStatus, CaseSeverity, CaseTimelineEventType
-from app.models.user import UserRole
-from app.models.user_record import UserRecord
-
-from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
@@ -19,7 +11,6 @@ from app.models.case import (
 )
 from app.models.user import UserRole
 from app.models.user_record import UserRecord
-
 
 PASSWORD = "CaseTests-StrongPassword-123!"
 
@@ -57,10 +48,7 @@ def register_user(
 def user_id_from_response(
     user: dict,
 ) -> str:
-    user_id = (
-        user.get("user_id")
-        or user.get("id")
-    )
+    user_id = user.get("user_id") or user.get("id")
 
     assert user_id is not None, user
 
@@ -85,23 +73,15 @@ def login_user(
 
     assert response.status_code == 200, response.text
 
-    token = response.json()[
-        "access_token"
-    ]
+    token = response.json()["access_token"]
 
-    return {
-        "Authorization": (
-            f"Bearer {token}"
-        )
-    }
+    return {"Authorization": (f"Bearer {token}")}
 
 
 def create_authenticated_user(
     client: TestClient,
 ) -> tuple[dict, dict[str, str]]:
-    user = register_user(
-        client
-    )
+    user = register_user(client)
 
     headers = login_user(
         client,
@@ -116,9 +96,7 @@ def create_case(
     headers: dict[str, str],
     *,
     title: str = "Suspicious authentication activity",
-    description: str | None = (
-        "Investigate repeated authentication failures."
-    ),
+    description: str | None = ("Investigate repeated authentication failures."),
     severity: str = CaseSeverity.HIGH.value,
     assigned_to_user_id: str | None = None,
 ) -> dict:
@@ -129,9 +107,7 @@ def create_case(
             "title": title,
             "description": description,
             "severity": severity,
-            "assigned_to_user_id": (
-                assigned_to_user_id
-            ),
+            "assigned_to_user_id": (assigned_to_user_id),
         },
     )
 
@@ -149,9 +125,7 @@ def create_analysis(
         headers=headers,
         json={
             "content": AUTH_LOG,
-            "source_name": (
-                "case-test-auth.log"
-            ),
+            "source_name": ("case-test-auth.log"),
         },
     )
 
@@ -159,10 +133,7 @@ def create_analysis(
 
     result = response.json()
 
-    analysis_id = (
-        result.get("analysis_id")
-        or result.get("id")
-    )
+    analysis_id = result.get("analysis_id") or result.get("id")
 
     if analysis_id is not None:
         return analysis_id
@@ -172,10 +143,7 @@ def create_analysis(
         headers=headers,
     )
 
-    assert (
-        history_response.status_code
-        == 200
-    ), history_response.text
+    assert history_response.status_code == 200, history_response.text
 
     history = history_response.json()
 
@@ -183,10 +151,7 @@ def create_analysis(
 
     latest = history[0]
 
-    analysis_id = (
-        latest.get("analysis_id")
-        or latest.get("id")
-    )
+    analysis_id = latest.get("analysis_id") or latest.get("id")
 
     assert analysis_id is not None, latest
 
@@ -196,45 +161,24 @@ def create_analysis(
 def test_user_can_create_and_view_case(
     client: TestClient,
 ):
-    user, headers = (
-        create_authenticated_user(
-            client
-        )
-    )
+    user, headers = create_authenticated_user(client)
 
-    user_id = (
-        user_id_from_response(
-            user
-        )
-    )
+    user_id = user_id_from_response(user)
 
     created = create_case(
         client,
         headers,
     )
 
-    assert created["title"] == (
-        "Suspicious authentication activity"
-    )
+    assert created["title"] == ("Suspicious authentication activity")
 
-    assert (
-        created["severity"]
-        == CaseSeverity.HIGH.value
-    )
+    assert created["severity"] == CaseSeverity.HIGH.value
 
-    assert (
-        created["status"]
-        == CaseStatus.OPEN.value
-    )
+    assert created["status"] == CaseStatus.OPEN.value
 
-    assert (
-        created["created_by_user_id"]
-        == user_id
-    )
+    assert created["created_by_user_id"] == user_id
 
-    case_id = created[
-        "case_id"
-    ]
+    case_id = created["case_id"]
 
     response = client.get(
         f"/cases/{case_id}",
@@ -245,40 +189,24 @@ def test_user_can_create_and_view_case(
 
     detail = response.json()
 
-    assert (
-        detail["case_id"]
-        == case_id
-    )
+    assert detail["case_id"] == case_id
 
     assert detail["analyses"] == []
     assert detail["notes"] == []
 
-    assert len(
-        detail["timeline"]
-    ) == 1
+    assert len(detail["timeline"]) == 1
 
     assert (
-        detail["timeline"][0][
-            "event_type"
-        ]
-        == CaseTimelineEventType.CASE_CREATED.value
+        detail["timeline"][0]["event_type"] == CaseTimelineEventType.CASE_CREATED.value
     )
 
 
 def test_other_user_cannot_view_case(
     client: TestClient,
 ):
-    _, owner_headers = (
-        create_authenticated_user(
-            client
-        )
-    )
+    _, owner_headers = create_authenticated_user(client)
 
-    _, other_headers = (
-        create_authenticated_user(
-            client
-        )
-    )
+    _, other_headers = create_authenticated_user(client)
 
     case = create_case(
         client,
@@ -296,11 +224,7 @@ def test_other_user_cannot_view_case(
 def test_user_can_link_own_analysis_to_case(
     client: TestClient,
 ):
-    _, headers = (
-        create_authenticated_user(
-            client
-        )
-    )
+    _, headers = create_authenticated_user(client)
 
     analysis_id = create_analysis(
         client,
@@ -313,10 +237,7 @@ def test_user_can_link_own_analysis_to_case(
     )
 
     response = client.post(
-        (
-            f"/cases/{case['case_id']}"
-            "/analyses"
-        ),
+        (f"/cases/{case['case_id']}" "/analyses"),
         headers=headers,
         json={
             "analysis_id": analysis_id,
@@ -327,37 +248,19 @@ def test_user_can_link_own_analysis_to_case(
 
     detail = response.json()
 
-    assert len(
-        detail["analyses"]
-    ) == 1
+    assert len(detail["analyses"]) == 1
 
-    assert (
-        detail["analyses"][0][
-            "analysis_id"
-        ]
-        == analysis_id
-    )
+    assert detail["analyses"][0]["analysis_id"] == analysis_id
 
-    event_types = {
-        event["event_type"]
-        for event
-        in detail["timeline"]
-    }
+    event_types = {event["event_type"] for event in detail["timeline"]}
 
-    assert (
-        CaseTimelineEventType.ANALYSIS_LINKED.value
-        in event_types
-    )
+    assert CaseTimelineEventType.ANALYSIS_LINKED.value in event_types
 
 
 def test_duplicate_analysis_link_returns_conflict(
     client: TestClient,
 ):
-    _, headers = (
-        create_authenticated_user(
-            client
-        )
-    )
+    _, headers = create_authenticated_user(client)
 
     analysis_id = create_analysis(
         client,
@@ -369,10 +272,7 @@ def test_duplicate_analysis_link_returns_conflict(
         headers,
     )
 
-    path = (
-        f"/cases/{case['case_id']}"
-        "/analyses"
-    )
+    path = f"/cases/{case['case_id']}" "/analyses"
 
     request = {
         "analysis_id": analysis_id,
@@ -392,49 +292,31 @@ def test_duplicate_analysis_link_returns_conflict(
         json=request,
     )
 
-    assert (
-        duplicate.status_code
-        == 409
-    )
+    assert duplicate.status_code == 409
 
 
 def test_user_cannot_link_another_users_analysis(
     client: TestClient,
 ):
-    _, owner_headers = (
-        create_authenticated_user(
-            client
-        )
-    )
+    _, owner_headers = create_authenticated_user(client)
 
-    _, other_headers = (
-        create_authenticated_user(
-            client
-        )
-    )
+    _, other_headers = create_authenticated_user(client)
 
     case = create_case(
         client,
         owner_headers,
     )
 
-    other_analysis_id = (
-        create_analysis(
-            client,
-            other_headers,
-        )
+    other_analysis_id = create_analysis(
+        client,
+        other_headers,
     )
 
     response = client.post(
-        (
-            f"/cases/{case['case_id']}"
-            "/analyses"
-        ),
+        (f"/cases/{case['case_id']}" "/analyses"),
         headers=owner_headers,
         json={
-            "analysis_id": (
-                other_analysis_id
-            ),
+            "analysis_id": (other_analysis_id),
         },
     )
 
@@ -444,23 +326,11 @@ def test_user_cannot_link_another_users_analysis(
 def test_assigned_user_can_access_case(
     client: TestClient,
 ):
-    _, owner_headers = (
-        create_authenticated_user(
-            client
-        )
-    )
+    _, owner_headers = create_authenticated_user(client)
 
-    analyst, analyst_headers = (
-        create_authenticated_user(
-            client
-        )
-    )
+    analyst, analyst_headers = create_authenticated_user(client)
 
-    analyst_id = (
-        user_id_from_response(
-            analyst
-        )
-    )
+    analyst_id = user_id_from_response(analyst)
 
     case = create_case(
         client,
@@ -468,26 +338,16 @@ def test_assigned_user_can_access_case(
     )
 
     assignment = client.patch(
-        (
-            f"/cases/{case['case_id']}"
-            "/assignment"
-        ),
+        (f"/cases/{case['case_id']}" "/assignment"),
         headers=owner_headers,
         json={
-            "assigned_to_user_id": (
-                analyst_id
-            ),
+            "assigned_to_user_id": (analyst_id),
         },
     )
 
     assert assignment.status_code == 200
 
-    assert (
-        assignment.json()[
-            "assigned_to_user_id"
-        ]
-        == analyst_id
-    )
+    assert assignment.json()["assigned_to_user_id"] == analyst_id
 
     response = client.get(
         f"/cases/{case['case_id']}",
@@ -500,42 +360,24 @@ def test_assigned_user_can_access_case(
 def test_assigned_user_can_add_case_note(
     client: TestClient,
 ):
-    _, owner_headers = (
-        create_authenticated_user(
-            client
-        )
-    )
+    _, owner_headers = create_authenticated_user(client)
 
-    analyst, analyst_headers = (
-        create_authenticated_user(
-            client
-        )
-    )
+    analyst, analyst_headers = create_authenticated_user(client)
 
-    analyst_id = (
-        user_id_from_response(
-            analyst
-        )
-    )
+    analyst_id = user_id_from_response(analyst)
 
     case = create_case(
         client,
         owner_headers,
-        assigned_to_user_id=(
-            analyst_id
-        ),
+        assigned_to_user_id=(analyst_id),
     )
 
     response = client.post(
-        (
-            f"/cases/{case['case_id']}"
-            "/notes"
-        ),
+        (f"/cases/{case['case_id']}" "/notes"),
         headers=analyst_headers,
         json={
             "content": (
-                "Confirmed repeated failures "
-                "originated from one source IP."
+                "Confirmed repeated failures " "originated from one source IP."
             ),
         },
     )
@@ -544,10 +386,7 @@ def test_assigned_user_can_add_case_note(
 
     note = response.json()
 
-    assert (
-        note["author_user_id"]
-        == analyst_id
-    )
+    assert note["author_user_id"] == analyst_id
 
     detail_response = client.get(
         f"/cases/{case['case_id']}",
@@ -558,96 +397,53 @@ def test_assigned_user_can_add_case_note(
 
     detail = detail_response.json()
 
-    assert len(
-        detail["notes"]
-    ) == 1
+    assert len(detail["notes"]) == 1
 
-    assert (
-        detail["notes"][0][
-            "content"
-        ]
-        == (
-            "Confirmed repeated failures "
-            "originated from one source IP."
-        )
+    assert detail["notes"][0]["content"] == (
+        "Confirmed repeated failures " "originated from one source IP."
     )
 
-    event_types = {
-        event["event_type"]
-        for event
-        in detail["timeline"]
-    }
+    event_types = {event["event_type"] for event in detail["timeline"]}
 
-    assert (
-        CaseTimelineEventType.NOTE_ADDED.value
-        in event_types
-    )
+    assert CaseTimelineEventType.NOTE_ADDED.value in event_types
 
 
 def test_status_and_severity_changes_are_tracked(
     client: TestClient,
 ):
-    _, headers = (
-        create_authenticated_user(
-            client
-        )
-    )
+    _, headers = create_authenticated_user(client)
 
     case = create_case(
         client,
         headers,
-        severity=(
-            CaseSeverity.MEDIUM.value
-        ),
+        severity=(CaseSeverity.MEDIUM.value),
     )
 
-    case_id = case[
-        "case_id"
-    ]
+    case_id = case["case_id"]
 
     status_response = client.patch(
         f"/cases/{case_id}/status",
         headers=headers,
         json={
-            "status": (
-                CaseStatus.INVESTIGATING.value
-            ),
+            "status": (CaseStatus.INVESTIGATING.value),
         },
     )
 
-    assert (
-        status_response.status_code
-        == 200
-    )
+    assert status_response.status_code == 200
 
-    assert (
-        status_response.json()[
-            "status"
-        ]
-        == CaseStatus.INVESTIGATING.value
-    )
+    assert status_response.json()["status"] == CaseStatus.INVESTIGATING.value
 
     severity_response = client.patch(
         f"/cases/{case_id}/severity",
         headers=headers,
         json={
-            "severity": (
-                CaseSeverity.CRITICAL.value
-            ),
+            "severity": (CaseSeverity.CRITICAL.value),
         },
     )
 
-    assert (
-        severity_response.status_code
-        == 200
-    )
+    assert severity_response.status_code == 200
 
-    assert (
-        severity_response.json()[
-            "severity"
-        ]
-        == CaseSeverity.CRITICAL.value
-    )
+    assert severity_response.json()["severity"] == CaseSeverity.CRITICAL.value
 
     detail_response = client.get(
         f"/cases/{case_id}",
@@ -656,33 +452,17 @@ def test_status_and_severity_changes_are_tracked(
 
     assert detail_response.status_code == 200
 
-    event_types = [
-        event["event_type"]
-        for event
-        in detail_response.json()[
-            "timeline"
-        ]
-    ]
+    event_types = [event["event_type"] for event in detail_response.json()["timeline"]]
 
-    assert (
-        CaseTimelineEventType.STATUS_CHANGED.value
-        in event_types
-    )
+    assert CaseTimelineEventType.STATUS_CHANGED.value in event_types
 
-    assert (
-        CaseTimelineEventType.SEVERITY_CHANGED.value
-        in event_types
-    )
+    assert CaseTimelineEventType.SEVERITY_CHANGED.value in event_types
 
 
 def test_closing_case_sets_closed_at(
     client: TestClient,
 ):
-    _, headers = (
-        create_authenticated_user(
-            client
-        )
-    )
+    _, headers = create_authenticated_user(client)
 
     case = create_case(
         client,
@@ -690,15 +470,10 @@ def test_closing_case_sets_closed_at(
     )
 
     response = client.patch(
-        (
-            f"/cases/{case['case_id']}"
-            "/status"
-        ),
+        (f"/cases/{case['case_id']}" "/status"),
         headers=headers,
         json={
-            "status": (
-                CaseStatus.CLOSED.value
-            ),
+            "status": (CaseStatus.CLOSED.value),
         },
     )
 
@@ -706,25 +481,15 @@ def test_closing_case_sets_closed_at(
 
     updated = response.json()
 
-    assert (
-        updated["status"]
-        == CaseStatus.CLOSED.value
-    )
+    assert updated["status"] == CaseStatus.CLOSED.value
 
-    assert (
-        updated["closed_at"]
-        is not None
-    )
+    assert updated["closed_at"] is not None
 
 
 def test_admin_can_access_another_users_case(
     client: TestClient,
 ):
-    _, owner_headers = (
-        create_authenticated_user(
-            client
-        )
-    )
+    _, owner_headers = create_authenticated_user(client)
 
     case = create_case(
         client,
@@ -733,13 +498,8 @@ def test_admin_can_access_another_users_case(
 
     admin = UserRecord(
         id=str(uuid4()),
-        email=(
-            f"admin-{uuid4().hex[:8]}"
-            "@example.com"
-        ),
-        username=(
-            f"admin_{uuid4().hex[:8]}"
-        ),
+        email=(f"admin-{uuid4().hex[:8]}" "@example.com"),
+        username=(f"admin_{uuid4().hex[:8]}"),
         password_hash="unused",
         role=UserRole.ADMIN.value,
         is_active=True,
@@ -748,30 +508,17 @@ def test_admin_can_access_another_users_case(
     def override_current_user() -> UserRecord:
         return admin
 
-    app.dependency_overrides[
-        get_current_user
-    ] = override_current_user
+    app.dependency_overrides[get_current_user] = override_current_user
 
     try:
-        response = client.get(
-            f"/cases/{case['case_id']}"
-        )
+        response = client.get(f"/cases/{case['case_id']}")
 
-        assert (
-            response.status_code
-            == 200
-        )
+        assert response.status_code == 200
 
-        assert (
-            response.json()[
-                "case_id"
-            ]
-            == case["case_id"]
-        )
+        assert response.json()["case_id"] == case["case_id"]
 
     finally:
         app.dependency_overrides.pop(
             get_current_user,
             None,
         )
-

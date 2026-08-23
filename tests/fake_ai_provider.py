@@ -1,13 +1,24 @@
 from app.ai.provider import AIProviderUnavailableError, GeneratedInvestigationReport
-from app.ai.schemas import AnalysisEvidence, InvestigationReportContent, InvestigationRiskLevel, InvestigationStep, KeyFinding, MitreAssessment, EvidenceBasis, EvidenceAssessment
+from app.ai.schemas import (
+    AnalysisEvidence,
+    EvidenceAssessment,
+    EvidenceBasis,
+    InvestigationReportContent,
+    InvestigationRiskLevel,
+    InvestigationStep,
+    KeyFinding,
+    MitreAssessment,
+)
 
 
 class FakeInvestigationProvider:
     provider_name = "fake"
     model_name = "fake-investigator-v1"
 
-    def generate_report(self,
-                        evidence: AnalysisEvidence,) -> GeneratedInvestigationReport:
+    def generate_report(
+        self,
+        evidence: AnalysisEvidence,
+    ) -> GeneratedInvestigationReport:
         report = InvestigationReportContent(
             executive_summary=(
                 "Repeated authentication failures indicate a likely"
@@ -23,8 +34,7 @@ class FakeInvestigationProvider:
             key_findings=[
                 KeyFinding(
                     finding=(
-                        "Multiple failed authentication attempts were "
-                        "detected."
+                        "Multiple failed authentication attempts were " "detected."
                     ),
                     supporting_evidence=[
                         f"Analysis {evidence.analysis_id}",
@@ -33,20 +43,15 @@ class FakeInvestigationProvider:
                     confidence=0.95,
                 )
             ],
-            evidence_assessment = [
+            evidence_assessment=[
                 EvidenceAssessment(
-                    basis=(
-                        EvidenceBasis.OBSERVED_EVIDENCE
-                    ),
+                    basis=(EvidenceBasis.OBSERVED_EVIDENCE),
                     statement=(
-                        "Repeated failed authentication "
-                        "events were observed."
+                        "Repeated failed authentication " "events were observed."
                     ),
                 ),
                 EvidenceAssessment(
-                    basis=(
-                        EvidenceBasis.DETECTION_ENGINE
-                    ),
+                    basis=(EvidenceBasis.DETECTION_ENGINE),
                     statement=(
                         "The deterministic detector identified "
                         "password guessing behaviour."
@@ -56,9 +61,7 @@ class FakeInvestigationProvider:
                     ],
                 ),
                 EvidenceAssessment(
-                    basis=(
-                        EvidenceBasis.ATTACK_KNOWLEDGE
-                    ),
+                    basis=(EvidenceBasis.ATTACK_KNOWLEDGE),
                     statement=(
                         "The behaviour is mapped to Password"
                         "Guessing in the supplied ATT&CK context"
@@ -112,27 +115,27 @@ class FakeInvestigationProvider:
             content=report,
         )
 
+
 class UnavailableInvestigationProvider:
     provider_name = "unavailable"
     model_name = "none"
 
-    def generate_report(self,
-                        evidence: AnalysisEvidence,) -> GeneratedInvestigationReport:
+    def generate_report(
+        self,
+        evidence: AnalysisEvidence,
+    ) -> GeneratedInvestigationReport:
         raise AIProviderUnavailableError("The test AI provider is unavailable.")
 
 
-class HallucinatingInvestigationProvider(
-    FakeInvestigationProvider
-):
+class HallucinatingInvestigationProvider(FakeInvestigationProvider):
     provider_name = "hallucinating"
     model_name = "bad-test-model"
 
     def generate_report(
-            self,
-    evidence: AnalysisEvidence,) -> GeneratedInvestigationReport:
-        generated = super().generate_report(
-            evidence
-        )
+        self,
+        evidence: AnalysisEvidence,
+    ) -> GeneratedInvestigationReport:
+        generated = super().generate_report(evidence)
 
         report = generated.content.model_copy(
             update={
@@ -140,12 +143,9 @@ class HallucinatingInvestigationProvider(
                     MitreAssessment(
                         tactic="Execution",
                         technique_id="T1059",
-                        technique_name=(
-                            "Command and Scripting Interpreter"
-                        ),
+                        technique_name=("Command and Scripting Interpreter"),
                         explanation=(
-                            "This technique was not "
-                            "retrieved and must be rejected."
+                            "This technique was not " "retrieved and must be rejected."
                         ),
                     )
                 ]
@@ -157,5 +157,3 @@ class HallucinatingInvestigationProvider(
             model=self.model_name,
             content=report,
         )
-
-

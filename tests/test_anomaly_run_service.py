@@ -1,32 +1,31 @@
 from datetime import datetime, timezone
 from uuid import uuid4
+
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
+
 from app.anomaly.schemas import AnomalyDetectionResult, EventAnomaly
 from app.core.database import Base
 from app.models.analysis_record import AnalysisRecord
 from app.models.anomaly_run_record import AnomalyRunRecord
 from app.models.user_record import UserRecord
-from app.services.anomaly_run_service import get_anomaly_run, get_latest_anomaly_run, list_anomaly_run, load_anomaly_result, save_anomaly_run
+from app.services.anomaly_run_service import (
+    get_anomaly_run,
+    get_latest_anomaly_run,
+    list_anomaly_run,
+    load_anomaly_result,
+    save_anomaly_run,
+)
+
 
 def build_database(
     tmp_path,
 ) -> sessionmaker[Session]:
-    database_path = (
-        tmp_path
-        / "anomaly-runs.db"
-    )
+    database_path = tmp_path / "anomaly-runs.db"
 
-    engine = create_engine(
-        (
-            "sqlite:///"
-            f"{database_path}"
-        )
-    )
+    engine = create_engine("sqlite:///" f"{database_path}")
 
-    Base.metadata.create_all(
-        engine
-    )
+    Base.metadata.create_all(engine)
 
     return sessionmaker(
         bind=engine,
@@ -39,12 +38,8 @@ def create_user(
 ) -> UserRecord:
     user = UserRecord(
         id=str(uuid4()),
-        email=(
-            f"{uuid4().hex}@example.com"
-        ),
-        username=(
-            f"user_{uuid4().hex[:8]}"
-        ),
+        email=(f"{uuid4().hex}@example.com"),
+        username=(f"user_{uuid4().hex[:8]}"),
         password_hash="test-hash",
         role="user",
         is_active=True,
@@ -103,26 +98,17 @@ def create_result(
                 event_index=7,
                 anomaly_score=anomaly_score,
                 reasons=[
-                    (
-                        "Source IP generated a high "
-                        "number of authentication failures."
-                    )
+                    "Source IP generated a high number of authentication failures."
                 ],
                 features={
                     "is_login_failure": 1.0,
                     "ip_failure_count": 8.0,
                 },
                 event={
-                    "timestamp": (
-                        "2026-08-20T03:00:00+00:00"
-                    ),
-                    "source_ip": (
-                        "203.0.113.250"
-                    ),
+                    "timestamp": ("2026-08-20T03:00:00+00:00"),
+                    "source_ip": ("203.0.113.250"),
                     "username": "target",
-                    "event_type": (
-                        "LOGIN_FAILURE"
-                    ),
+                    "event_type": ("LOGIN_FAILURE"),
                 },
             )
         ],
@@ -133,14 +119,10 @@ def create_result(
 def test_saves_complete_anomaly_run(
     tmp_path,
 ):
-    SessionLocal = build_database(
-        tmp_path
-    )
+    SessionLocal = build_database(tmp_path)
 
     with SessionLocal() as session:
-        user = create_user(
-            session
-        )
+        user = create_user(session)
 
         analysis = create_analysis(
             session,
@@ -157,55 +139,27 @@ def test_saves_complete_anomaly_run(
         )
 
         assert record.id
-        assert (
-            record.analysis_id
-            == analysis.id
-        )
-        assert (
-            record.requested_by_user_id
-            == user.id
-        )
+        assert record.analysis_id == analysis.id
+        assert record.requested_by_user_id == user.id
 
-        assert (
-            record.model_name
-            == "IsolationForest"
-        )
+        assert record.model_name == "IsolationForest"
 
-        assert (
-            record.contamination
-            == 0.05
-        )
+        assert record.contamination == 0.05
 
-        assert (
-            record.anomaly_count
-            == 1
-        )
+        assert record.anomaly_count == 1
 
-        assert (
-            record.result_json[
-                "anomalies"
-            ][0]["event_index"]
-            == 7
-        )
+        assert record.result_json["anomalies"][0]["event_index"] == 7
 
-        assert (
-            record.result_json[
-                "anomalies"
-            ][0]["reasons"]
-        )
+        assert record.result_json["anomalies"][0]["reasons"]
 
 
 def test_loads_validated_persisted_result(
     tmp_path,
 ):
-    SessionLocal = build_database(
-        tmp_path
-    )
+    SessionLocal = build_database(tmp_path)
 
     with SessionLocal() as session:
-        user = create_user(
-            session
-        )
+        user = create_user(session)
 
         analysis = create_analysis(
             session,
@@ -228,38 +182,22 @@ def test_loads_validated_persisted_result(
             requested_by_user_id=user.id,
         )
 
-        assert (
-            loaded_record
-            is not None
-        )
+        assert loaded_record is not None
 
-        result = load_anomaly_result(
-            loaded_record
-        )
+        result = load_anomaly_result(loaded_record)
 
-        assert (
-            result.model_name
-            == "IsolationForest"
-        )
+        assert result.model_name == "IsolationForest"
 
-        assert (
-            result.anomalies[0]
-            .anomaly_score
-            == 0.87
-        )
+        assert result.anomalies[0].anomaly_score == 0.87
 
 
 def test_returns_latest_and_lists_runs(
     tmp_path,
 ):
-    SessionLocal = build_database(
-        tmp_path
-    )
+    SessionLocal = build_database(tmp_path)
 
     with SessionLocal() as session:
-        user = create_user(
-            session
-        )
+        user = create_user(session)
 
         analysis = create_analysis(
             session,
@@ -306,31 +244,20 @@ def test_returns_latest_and_lists_runs(
 
         session.commit()
 
-        latest = (
-            get_latest_anomaly_run(
-                session,
-                analysis_id=(
-                    analysis.id
-                ),
-            )
+        latest = get_latest_anomaly_run(
+            session,
+            analysis_id=(analysis.id),
         )
 
         assert latest is not None
-        assert (
-            latest.id
-            == second.id
-        )
+        assert latest.id == second.id
 
         records = list_anomaly_run(
             session,
             analysis_id=analysis.id,
         )
 
-        assert [
-            record.id
-            for record in records
-        ] == [
+        assert [record.id for record in records] == [
             second.id,
             first.id,
         ]
-

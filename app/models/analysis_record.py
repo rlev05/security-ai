@@ -1,8 +1,10 @@
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
-from sqlalchemy import DateTime, Integer, JSON, String, ForeignKey
+
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.database import Base
 
 
@@ -11,11 +13,11 @@ def generate_uuid() -> str:
     return str(uuid4())
 
 
-
 def utc_now() -> datetime:
-    """Return Current time """
+    """Return Current time"""
 
     return datetime.now(timezone.utc)
+
 
 class AnalysisRecord(Base):
     """Persisted snap  of one completed security analysis"""

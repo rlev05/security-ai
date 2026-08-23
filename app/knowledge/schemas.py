@@ -19,9 +19,7 @@ class AttackDetectionStrategyKnowledge(BaseModel):
     description: str | None = None
     source_url: str | None = None
 
-    analytics: list[AttackAnalyticKnowledge] = Field(
-        default_factory=list
-    )
+    analytics: list[AttackAnalyticKnowledge] = Field(default_factory=list)
 
 
 class AttackMitigationKnowledge(BaseModel):
@@ -40,25 +38,15 @@ class AttackTechniqueKnowledge(BaseModel):
     name: str
     description: str
 
-    tactics: list[str] = Field(
-        default_factory=list
-    )
+    tactics: list[str] = Field(default_factory=list)
 
-    platforms: list[str] = Field(
-        default_factory=list
-    )
+    platforms: list[str] = Field(default_factory=list)
 
     source_url: str
 
-    mitigations: list[
-        AttackMitigationKnowledge
-    ] = Field(
-        default_factory=list
-    )
+    mitigations: list[AttackMitigationKnowledge] = Field(default_factory=list)
 
-    detection_strategies: list[
-        AttackDetectionStrategyKnowledge
-    ] = Field(
+    detection_strategies: list[AttackDetectionStrategyKnowledge] = Field(
         default_factory=list
     )
 
@@ -78,11 +66,7 @@ class AttackKnowledgeSnapshot(BaseModel):
 
     metadata: AttackKnowledgeMetadata
 
-    techniques: list[
-        AttackTechniqueKnowledge
-    ] = Field(
-        default_factory=list
-    )
+    techniques: list[AttackTechniqueKnowledge] = Field(default_factory=list)
 
 
 class AttackGroundingContext(BaseModel):
@@ -92,12 +76,6 @@ class AttackGroundingContext(BaseModel):
 
     attack_version: str
 
-    techniques: list[
-        AttackTechniqueKnowledge
-    ] = Field(
-        default_factory=list
-    )
+    techniques: list[AttackTechniqueKnowledge] = Field(default_factory=list)
 
-    unresolved_technique_ids: list[str] = Field(
-        default_factory=list
-    )
+    unresolved_technique_ids: list[str] = Field(default_factory=list)

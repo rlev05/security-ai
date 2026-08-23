@@ -17,14 +17,10 @@ def detect_password_spraying(
     """
 
     if username_threshold < 2:
-        raise ValueError(
-            "Username threshold must be at least 2"
-        )
+        raise ValueError("Username threshold must be at least 2")
 
     if window <= timedelta(0):
-        raise ValueError(
-            "Window must be greater than zero"
-        )
+        raise ValueError("Window must be greater than zero")
 
     failures_by_ip: dict[
         str,
@@ -46,14 +42,10 @@ def detect_password_spraying(
         left = 0
 
         for right, current_event in enumerate(ordered_events):
-            while (
-                current_event.timestamp
-                - ordered_events[left].timestamp
-                > window
-            ):
+            while current_event.timestamp - ordered_events[left].timestamp > window:
                 left += 1
 
-            window_events = ordered_events[left:right + 1]
+            window_events = ordered_events[left : right + 1]
 
             events_by_username: dict[str, SecurityEvent] = {}
 
@@ -67,13 +59,9 @@ def detect_password_spraying(
             if len(events_by_username) < username_threshold:
                 continue
 
-            matching_events = list(
-                events_by_username.values()
-            )
+            matching_events = list(events_by_username.values())
 
-            window_minutes = int(
-                window.total_seconds() // 60
-            )
+            window_minutes = int(window.total_seconds() // 60)
 
             alert = Alert(
                 rule_id="AUTH-PASSWORD-SPRAY-001",
@@ -89,10 +77,7 @@ def detect_password_spraying(
                 mitre_tactic="Credential Access",
                 mitre_technique_id="T1110.003",
                 mitre_technique_name="Password Spraying",
-                evidence=[
-                    event.raw_log
-                    for event in matching_events
-                ],
+                evidence=[event.raw_log for event in matching_events],
             )
 
             incidents.append(

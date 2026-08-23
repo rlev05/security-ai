@@ -6,7 +6,5 @@ from app.knowledge.attack_repository import (
 
 
 @lru_cache
-def get_attack_repository() -> (
-    AttackKnowledgeRepository
-):
+def get_attack_repository() -> AttackKnowledgeRepository:
     return AttackKnowledgeRepository.from_file()

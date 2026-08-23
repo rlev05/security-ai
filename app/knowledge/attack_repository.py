@@ -8,17 +8,12 @@ from app.knowledge.schemas import (
     AttackTechniqueKnowledge,
 )
 
-
 DEFAULT_ATTACK_KNOWLEDGE_PATH = (
-    Path(__file__).resolve().parent
-    / "data"
-    / "enterprise_attack_v19_1.json"
+    Path(__file__).resolve().parent / "data" / "enterprise_attack_v19_1.json"
 )
 
 
-class AttackKnowledgeUnavailableError(
-    RuntimeError
-):
+class AttackKnowledgeUnavailableError(RuntimeError):
     """Raised when the local ATT&CK knowledge base cannot be loaded."""
 
 
@@ -48,17 +43,9 @@ class AttackKnowledgeRepository:
             )
 
         try:
-            payload = json.loads(
-                path.read_text(
-                    encoding="utf-8"
-                )
-            )
+            payload = json.loads(path.read_text(encoding="utf-8"))
 
-            snapshot = (
-                AttackKnowledgeSnapshot.model_validate(
-                    payload
-                )
-            )
+            snapshot = AttackKnowledgeSnapshot.model_validate(payload)
         except (
             OSError,
             json.JSONDecodeError,
@@ -74,35 +61,25 @@ class AttackKnowledgeRepository:
         self,
         technique_id: str,
     ) -> AttackTechniqueKnowledge | None:
-        return self._techniques.get(
-            technique_id.strip().upper()
-        )
+        return self._techniques.get(technique_id.strip().upper())
 
     def get_techniques(
         self,
         technique_ids: list[str],
     ) -> list[AttackTechniqueKnowledge]:
-        result: list[
-            AttackTechniqueKnowledge
-        ] = []
+        result: list[AttackTechniqueKnowledge] = []
 
         seen: set[str] = set()
 
         for technique_id in technique_ids:
-            normalised = (
-                technique_id
-                .strip()
-                .upper()
-            )
+            normalised = technique_id.strip().upper()
 
             if normalised in seen:
                 continue
 
             seen.add(normalised)
 
-            technique = self.get_technique(
-                normalised
-            )
+            technique = self.get_technique(normalised)
 
             if technique is not None:
                 result.append(technique)
@@ -113,20 +90,11 @@ class AttackKnowledgeRepository:
         self,
         result_json: dict[str, Any],
     ) -> AttackGroundingContext:
-        detected_ids = (
-            extract_detected_technique_ids(
-                result_json
-            )
-        )
+        detected_ids = extract_detected_technique_ids(result_json)
 
-        matched = self.get_techniques(
-            detected_ids
-        )
+        matched = self.get_techniques(detected_ids)
 
-        matched_ids = {
-            technique.technique_id
-            for technique in matched
-        }
+        matched_ids = {technique.technique_id for technique in matched}
 
         unresolved = [
             technique_id
@@ -135,9 +103,7 @@ class AttackKnowledgeRepository:
         ]
 
         return AttackGroundingContext(
-            attack_version=(
-                self.snapshot.metadata.attack_version
-            ),
+            attack_version=(self.snapshot.metadata.attack_version),
             techniques=matched,
             unresolved_technique_ids=unresolved,
         )
@@ -165,9 +131,7 @@ def extract_detected_technique_ids(
                     and isinstance(child, str)
                     and child.strip()
                 ):
-                    technique_ids.add(
-                        child.strip().upper()
-                    )
+                    technique_ids.add(child.strip().upper())
                 else:
                     visit(child)
 

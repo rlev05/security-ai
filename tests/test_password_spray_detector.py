@@ -1,14 +1,16 @@
 from datetime import datetime, timedelta
+
 import pytest
+
 from app.detection.password_spray_detector import detect_password_spraying
 from app.models.alert import Severity
 from app.models.event import EventType, SecurityEvent
 
 
 def create_failed_login(
-        minute: int,
-        username: str,
-        source_ip: str = "192.168.1.5",
+    minute: int,
+    username: str,
+    source_ip: str = "192.168.1.5",
 ) -> SecurityEvent:
     raw_log = (
         f"2026-08-02T12:{minute:02d}:00"
@@ -96,10 +98,7 @@ def test_does_not_combine_different_ip_addresses() -> None:
 
 
 def test_rejects_invalid_username_threshold() -> None:
-    with pytest.raises(
-            ValueError,
-        match="Window must be greater than zero"
-    ):
+    with pytest.raises(ValueError, match="Window must be greater than zero"):
         detect_password_spraying(
             [],
             window=timedelta(0),

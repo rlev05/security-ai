@@ -1,5 +1,7 @@
 import pytest
+
 from app.services.analysis_service import analyse_auth_log
+
 
 def test_analyses_complete_authentication_log() -> None:
     content = """
@@ -12,7 +14,7 @@ def test_analyses_complete_authentication_log() -> None:
 
     result = analyse_auth_log(content)
 
-    assert result.total_lines ==5
+    assert result.total_lines == 5
     assert result.ignored_lines == 0
     assert len(result.events) == 5
     assert len(result.incidents) == 1
@@ -20,7 +22,6 @@ def test_analyses_complete_authentication_log() -> None:
     alert = result.incidents[0].alerts[0]
 
     assert alert.rule_id == "AUTH-BRUTE-FORCE-001"
-
 
 
 def test_detects_password_spraying_attack() -> None:
@@ -41,8 +42,6 @@ def test_detects_password_spraying_attack() -> None:
     assert alert.mitre_technique_id == "T1110.003"
 
 
-
-
 def test_tracks_ignored_lines() -> None:
     content = """
      2026-08-01T12:00:00 Failed password for admin from 192.168.1.5
@@ -57,10 +56,11 @@ def test_tracks_ignored_lines() -> None:
     assert len(result.events) == 1
     assert len(result.incidents) == 0
 
+
 def test_rejects_empty_content() -> None:
     with pytest.raises(
-            ValueError,
-            match="Log content cannot be empty",
+        ValueError,
+        match="Log content cannot be empty",
     ):
         analyse_auth_log("  ")
 
@@ -77,14 +77,8 @@ def test_correlates_success_after_failed_logins() -> None:
 
     result = analyse_auth_log(content)
 
-    rule_ids = {
-        incident.alerts[0].rule_id
-        for incident in result.incidents
-    }
+    rule_ids = {incident.alerts[0].rule_id for incident in result.incidents}
 
     assert len(result.events) == 6
     assert "AUTH-BRUTE-FORCE-001" in rule_ids
-    assert (
-        "AUTH-SUCCESS-AFTER-FAILURES-001"
-        in rule_ids
-    )
+    assert "AUTH-SUCCESS-AFTER-FAILURES-001" in rule_ids

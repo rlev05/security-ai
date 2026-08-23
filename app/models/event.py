@@ -2,10 +2,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 
+
 class EventType(Enum):
     LOGIN_SUCCESS = "login_success"
     LOGIN_FAILURE = "login_failed"
     UNKNOWN = "unknown"
+
 
 @dataclass(slots=True)
 class SecurityEvent:
@@ -14,5 +16,3 @@ class SecurityEvent:
     username: str
     event_type: EventType
     raw_log: str
-
-

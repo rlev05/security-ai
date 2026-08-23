@@ -1,13 +1,17 @@
 from datetime import datetime
 from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict, Field
+
 from app.ioc.schemas import Indicator
+
 
 class ThreatIntelLookupStatus(StrEnum):
     ENRICHED = "enriched"
     CACHED = "cached"
     SKIPPED = "skipped"
     FAILED = "failed"
+
 
 class IPReputation(BaseModel):
     model_config = ConfigDict(
@@ -48,6 +52,7 @@ class IPReputation(BaseModel):
 
     last_reported_at: datetime | None = None
 
+
 class ThreatIntelItem(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -63,6 +68,7 @@ class ThreatIntelItem(BaseModel):
 
     reason: str | None = None
 
+
 class ThreatIntelContext(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -71,6 +77,3 @@ class ThreatIntelContext(BaseModel):
     items: list[ThreatIntelItem] = Field(
         default_factory=list,
     )
-
-
-

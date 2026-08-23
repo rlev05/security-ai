@@ -1,16 +1,20 @@
 import uuid
 from datetime import datetime
 from typing import Any
-from sqlalchemy import DateTime, ForeignKey, JSON, String, func
+
+from sqlalchemy import JSON, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.database import Base
 from app.models.investigation_report import InvestigationReportStatus
+
 
 def generate_investigation_report_id() -> str:
     return str(uuid.uuid4())
 
+
 class InvestigationReportRecord(Base):
-    __tablename__ = 'investigation_reports'
+    __tablename__ = "investigation_reports"
 
     id: Mapped[str] = mapped_column(
         String(36),
@@ -60,23 +64,17 @@ class InvestigationReportRecord(Base):
         nullable=True,
     )
 
-    grounding_json: Mapped[
-        dict[str, Any] | None
-    ] = mapped_column(
+    grounding_json: Mapped[dict[str, Any] | None] = mapped_column(
         JSON,
         nullable=True,
     )
 
-    threat_intel_json: Mapped[
-        dict[str, Any] | None
-    ] = mapped_column(
+    threat_intel_json: Mapped[dict[str, Any] | None] = mapped_column(
         JSON,
         nullable=True,
     )
 
-    anomaly_json: Mapped[
-        dict[str, Any] | None
-    ] = mapped_column(
+    anomaly_json: Mapped[dict[str, Any] | None] = mapped_column(
         JSON,
         nullable=True,
     )
@@ -96,4 +94,3 @@ class InvestigationReportRecord(Base):
         DateTime(timezone=True),
         nullable=True,
     )
-

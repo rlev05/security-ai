@@ -1,16 +1,15 @@
 from collections import defaultdict
 from datetime import timedelta
 
-from app.api.schemas import SecurityEventResponse
 from app.models.alert import Alert, Severity
 from app.models.event import EventType, SecurityEvent
 from app.models.incident import Incident
 
 
 def detect_brute_force(
-        events: list[SecurityEvent],
-        threshold: int = 5,
-        window: timedelta = timedelta(minutes=5),
+    events: list[SecurityEvent],
+    threshold: int = 5,
+    window: timedelta = timedelta(minutes=5),
 ) -> list[Incident]:
     """Detect repeated failed logins from the same IP address within a specified time window"""
 
@@ -78,14 +77,3 @@ def detect_brute_force(
                 break
 
     return incidents
-
-
-
-
-
-
-
-            
-            
-
-

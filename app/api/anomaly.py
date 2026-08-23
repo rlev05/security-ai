@@ -43,7 +43,6 @@ from app.services.anomaly_run_service import (
     save_anomaly_run,
 )
 
-
 router = APIRouter(
     prefix="/analysis",
     tags=["ML anomaly detection"],
@@ -64,10 +63,7 @@ CurrentUser = Annotated[
 def _is_admin(
     user: UserRecord,
 ) -> bool:
-    return (
-        user.role
-        == UserRole.ADMIN.value
-    )
+    return user.role == UserRole.ADMIN.value
 
 
 def _normalise_event_list(
@@ -97,18 +93,12 @@ def _find_nested_events(
         dict,
     ):
         if "events" in value:
-            events = (
-                _normalise_event_list(
-                    value["events"]
-                )
-            )
+            events = _normalise_event_list(value["events"])
 
             if events:
                 return events
 
-        for nested_value in (
-            value.values()
-        ):
+        for nested_value in value.values():
             if not isinstance(
                 nested_value,
                 (
@@ -118,11 +108,7 @@ def _find_nested_events(
             ):
                 continue
 
-            events = (
-                _find_nested_events(
-                    nested_value
-                )
-            )
+            events = _find_nested_events(nested_value)
 
             if events:
                 return events
@@ -141,11 +127,7 @@ def _find_nested_events(
             ):
                 continue
 
-            events = (
-                _find_nested_events(
-                    item
-                )
-            )
+            events = _find_nested_events(item)
 
             if events:
                 return events
@@ -156,9 +138,7 @@ def _find_nested_events(
 def _extract_events(
     result_json: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    return _find_nested_events(
-        result_json
-    )
+    return _find_nested_events(result_json)
 
 
 def _get_visible_analysis(
@@ -167,13 +147,7 @@ def _get_visible_analysis(
     analysis_id: str,
     current_user: UserRecord,
 ):
-    owner_user_id = (
-        None
-        if _is_admin(
-            current_user
-        )
-        else current_user.id
-    )
+    owner_user_id = None if _is_admin(current_user) else current_user.id
 
     analysis = get_analysis_record(
         database,
@@ -183,12 +157,8 @@ def _get_visible_analysis(
 
     if analysis is None:
         raise HTTPException(
-            status_code=(
-                status.HTTP_404_NOT_FOUND
-            ),
-            detail=(
-                "Analysis not found"
-            ),
+            status_code=(status.HTTP_404_NOT_FOUND),
+            detail=("Analysis not found"),
         )
 
     return analysis
@@ -204,9 +174,7 @@ def _build_run_summary(
         model_version=record.model_version,
         contamination=record.contamination,
         total_events=record.total_events,
-        analysed_events=(
-            record.analysed_events
-        ),
+        analysed_events=(record.analysed_events),
         anomaly_count=record.anomaly_count,
         created_at=record.created_at,
     )
@@ -215,14 +183,10 @@ def _build_run_summary(
 def _build_run_response(
     record: AnomalyRunRecord,
 ) -> AnomalyRunResponse:
-    result = load_anomaly_result(
-        record
-    )
+    result = load_anomaly_result(record)
 
     return AnomalyRunResponse(
-        **_build_run_summary(
-            record
-        ).model_dump(),
+        **_build_run_summary(record).model_dump(),
         result=result,
     )
 
@@ -241,10 +205,7 @@ def run_anomaly_detection(
         Query(
             gt=0.0,
             lt=0.5,
-            description=(
-                "Expected proportion of "
-                "anomalous events."
-            ),
+            description=("Expected proportion of " "anomalous events."),
         ),
     ] = DEFAULT_CONTAMINATION,
 ) -> AnomalyRunResponse:
@@ -263,9 +224,7 @@ def run_anomaly_detection(
         else {}
     )
 
-    events = _extract_events(
-        result_json
-    )
+    events = _extract_events(result_json)
 
     result = detect_event_anomalies(
         events,
@@ -275,15 +234,11 @@ def run_anomaly_detection(
     record = save_anomaly_run(
         database,
         analysis_id=analysis.id,
-        requested_by_user_id=(
-            current_user.id
-        ),
+        requested_by_user_id=(current_user.id),
         result=result,
     )
 
-    return _build_run_response(
-        record
-    )
+    return _build_run_response(record)
 
 
 @router.get(
@@ -308,25 +263,16 @@ def get_latest_anomaly_detection(
 
     if record is None:
         raise HTTPException(
-            status_code=(
-                status.HTTP_404_NOT_FOUND
-            ),
-            detail=(
-                "No anomaly-detection run "
-                "exists for this analysis"
-            ),
+            status_code=(status.HTTP_404_NOT_FOUND),
+            detail=("No anomaly-detection run " "exists for this analysis"),
         )
 
-    return _build_run_response(
-        record
-    )
+    return _build_run_response(record)
 
 
 @router.get(
     "/{analysis_id}/anomalies/history",
-    response_model=list[
-        AnomalyRunSummary
-    ],
+    response_model=list[AnomalyRunSummary],
 )
 def get_anomaly_detection_history(
     analysis_id: str,
@@ -359,9 +305,4 @@ def get_anomaly_detection_history(
         offset=offset,
     )
 
-    return [
-        _build_run_summary(
-            record
-        )
-        for record in records
-    ]
+    return [_build_run_summary(record) for record in records]

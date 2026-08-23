@@ -18,10 +18,7 @@ FEATURE_NAMES = [
 ]
 
 
-def _get_first(
-        event: dict[str, Any],
-        *keys: str
-) -> Any:
+def _get_first(event: dict[str, Any], *keys: str) -> Any:
     for key in keys:
         value = event.get(key)
 
@@ -30,58 +27,36 @@ def _get_first(
 
     return None
 
-def _normalise_text(
-        value: Any
-) -> str:
+
+def _normalise_text(value: Any) -> str:
     if value is None:
         return ""
 
     return str(value).strip().lower()
 
+
 def _event_type(
-        event: dict[str, Any],
+    event: dict[str, Any],
 ) -> str:
-    return _normalise_text(
-        _get_first(
-            event,
-            "event_type",
-            "type"
-        )
-    )
+    return _normalise_text(_get_first(event, "event_type", "type"))
+
 
 def _username(
-        event: dict[str, Any],
+    event: dict[str, Any],
 ) -> str:
-    return _normalise_text(
-        _get_first(
-            event,
-            "username",
-            "user",
-            "account"
-        )
-    )
+    return _normalise_text(_get_first(event, "username", "user", "account"))
+
 
 def _ip_address(
-        event: dict[str, Any],
+    event: dict[str, Any],
 ) -> str:
-    return _normalise_text(
-        _get_first(
-            event,
-            "ip_address",
-            "source_ip",
-            "ip"
-        )
-    )
+    return _normalise_text(_get_first(event, "ip_address", "source_ip", "ip"))
+
 
 def _parse_timestamp(
-        event: dict[str, Any],
+    event: dict[str, Any],
 ) -> datetime | None:
-    value = _get_first(
-        event,
-        "timestamp",
-        "event_time",
-        "time"
-    )
+    value = _get_first(event, "timestamp", "event_time", "time")
 
     if isinstance(value, datetime):
         timestamp = value
@@ -109,23 +84,18 @@ def _parse_timestamp(
     return timestamp.astimezone(timezone.utc)
 
 
-def _is_failure(
-        event_type: str
-) -> bool:
+def _is_failure(event_type: str) -> bool:
 
     return ("failure" in event_type) or ("failed" in event_type)
 
 
-def _is_success(
-        event_type: str
-) -> bool:
+def _is_success(event_type: str) -> bool:
     return ("success" in event_type) or ("successful" in event_type)
 
 
 def build_event_features(
-        events: list[dict[str, Any]],
+    events: list[dict[str, Any]],
 ) -> list[dict[str, float]]:
-
     """
     Convert security events into numeric behavioural features.
 
@@ -275,5 +245,3 @@ def build_event_features(
         )
 
     return feature_rows
-
-

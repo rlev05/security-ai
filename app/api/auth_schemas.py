@@ -1,6 +1,9 @@
 from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
 from app.models.user import UserRole
+
 
 class UserCreateRequest(BaseModel):
     email: EmailStr
@@ -15,6 +18,7 @@ class UserCreateRequest(BaseModel):
         max_length=128,
     )
 
+
 class UserResponse(BaseModel):
     id: str
     email: EmailStr
@@ -23,11 +27,9 @@ class UserResponse(BaseModel):
     is_active: bool
     created_at: datetime
 
-    model_config = ConfigDict(
-        from_attributes=True
-    )
+    model_config = ConfigDict(from_attributes=True)
+
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-

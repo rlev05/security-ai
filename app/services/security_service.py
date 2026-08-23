@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta, timezone
+
 import jwt
 from jwt import InvalidTokenError
 from pwdlib import PasswordHash
-from app.core.config import get_settings
 
+from app.core.config import get_settings
 
 password_hasher = PasswordHash.recommended()
 
@@ -15,8 +16,8 @@ def hash_pashword(password: str) -> str:
 
 
 def verify_password(
-        password: str,
-        password_hash: str,
+    password: str,
+    password_hash: str,
 ) -> bool:
     """Verify a password against a stored hash"""
 
@@ -47,16 +48,18 @@ def create_access_token(user_id: str) -> str:
         algorithm=settings.jwt_algorithm,
     )
 
+
 def decode_access_token(token: str) -> str:
     """Decode a signed access token"""
 
     settings = get_settings()
 
     try:
-        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        payload = jwt.decode(
+            token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
+        )
     except InvalidTokenError as exc:
-        raise ValueError("Invalid or expired access token"
-                         ) from exc
+        raise ValueError("Invalid or expired access token") from exc
 
     if payload.get("type") != "access":
         raise ValueError("Invalid token type")
@@ -67,5 +70,3 @@ def decode_access_token(token: str) -> str:
         raise ValueError("Access token does not contain a valid user ID")
 
     return user_id
-
-

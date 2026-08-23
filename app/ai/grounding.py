@@ -17,25 +17,14 @@ def validate_and_normalise_grounded_report(
 ) -> InvestigationReportContent:
     """Validate AI ATT&CK claims against trusted retrieved data."""
 
-    allowed = {
-        technique.technique_id: technique
-        for technique in context.techniques
-    }
+    allowed = {technique.technique_id: technique for technique in context.techniques}
 
-    normalised_mitre: list[
-        MitreAssessment
-    ] = []
+    normalised_mitre: list[MitreAssessment] = []
 
     for assessment in report.mitre_assessment:
-        technique_id = (
-            assessment.technique_id
-            .strip()
-            .upper()
-        )
+        technique_id = assessment.technique_id.strip().upper()
 
-        technique = allowed.get(
-            technique_id
-        )
+        technique = allowed.get(technique_id)
 
         if technique is None:
             raise AIProviderResponseError(
@@ -47,15 +36,9 @@ def validate_and_normalise_grounded_report(
         normalised_mitre.append(
             assessment.model_copy(
                 update={
-                    "technique_id": (
-                        technique.technique_id
-                    ),
-                    "technique_name": (
-                        technique.name
-                    ),
-                    "tactic": ", ".join(
-                        technique.tactics
-                    ),
+                    "technique_id": (technique.technique_id),
+                    "technique_name": (technique.name),
+                    "tactic": ", ".join(technique.tactics),
                 }
             )
         )
@@ -64,9 +47,7 @@ def validate_and_normalise_grounded_report(
 
     for evidence in report.evidence_assessment:
         technique_ids = [
-            technique_id.strip().upper()
-            for technique_id
-            in evidence.technique_ids
+            technique_id.strip().upper() for technique_id in evidence.technique_ids
         ]
 
         for technique_id in technique_ids:
@@ -77,11 +58,7 @@ def validate_and_normalise_grounded_report(
                     f"retrieved context: {technique_id}"
                 )
 
-        if (
-            evidence.basis
-            == EvidenceBasis.ATTACK_KNOWLEDGE
-            and not technique_ids
-        ):
+        if evidence.basis == EvidenceBasis.ATTACK_KNOWLEDGE and not technique_ids:
             raise AIProviderResponseError(
                 "ATT&CK knowledge claims must reference "
                 "at least one retrieved technique."
@@ -97,12 +74,7 @@ def validate_and_normalise_grounded_report(
 
     return report.model_copy(
         update={
-            "mitre_assessment": (
-                normalised_mitre
-            ),
-            "evidence_assessment": (
-                normalised_evidence
-            ),
+            "mitre_assessment": (normalised_mitre),
+            "evidence_assessment": (normalised_evidence),
         }
     )
-

@@ -1,20 +1,21 @@
 from urllib.parse import urlsplit
+
 from fastapi import FastAPI, Request
-from fastapi.responses import Response, JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from app.api.analysis import router as analysis_router
-from app.api.auth import router as auth_router
+
 from app.api.ai_reports import router as ai_reports_router
-from app.api.cases import router as cases_router
+from app.api.analysis import router as analysis_router
 from app.api.anomaly import router as anomaly_router
+from app.api.auth import router as auth_router
+from app.api.cases import router as cases_router
 from app.api.workspace import router as workspace_router
-from app.dashboard.router import router as dashboard_router
 from app.core.config import get_settings
+from app.dashboard.router import router as dashboard_router
+
 app = FastAPI(
     title="Security AI Platform",
-    description=(
-        "AI-assisted cybersecurity investigation platform."
-    ),
+    description=("AI-assisted cybersecurity investigation platform."),
     version="0.1.0",
 )
 
@@ -30,9 +31,8 @@ SAFE_HTTP_METHODS = {
     "OPTIONS",
 }
 
-def _is_dashboard_browser_path(
-        path: str
-) -> bool:
+
+def _is_dashboard_browser_path(path: str) -> bool:
     """
     Return True for browser-dashboard routes that use
     cookie-based authentication.
@@ -47,21 +47,20 @@ def _is_dashboard_browser_path(
         or path.startswith("/dashboard/")
     )
 
+
 def _request_origin(
-        request: Request,
+    request: Request,
 ) -> str:
     """
     Return the origin represented by the incoming request.
     """
 
-    return  (
-        f"{request.url.scheme}://"
-        f"{request.url.netloc}"
-    )
+    return f"{request.url.scheme}://" f"{request.url.netloc}"
+
 
 def _same_origin(
-        candidate: str,
-        expected: str,
+    candidate: str,
+    expected: str,
 ) -> bool:
     """
     Compare two origins by scheme and network location.
@@ -77,12 +76,12 @@ def _same_origin(
 
     return (
         candidate_url.scheme.lower() == expected_url.scheme.lower()
-        and
-        candidate_url.netloc.lower() == expected_url.netloc.lower()
+        and candidate_url.netloc.lower() == expected_url.netloc.lower()
     )
 
+
 def _csrf_request_is_allowed(
-        request: Request,
+    request: Request,
 ) -> bool:
     """
     Validate browser metadata for a state-changing
@@ -101,12 +100,9 @@ def _csrf_request_is_allowed(
     browser-level CSRF boundary.
     """
 
-    fetch_site = (request.headers.get("sec-fetch-site"))
+    fetch_site = request.headers.get("sec-fetch-site")
 
-    if (
-        fetch_site is not None
-        and fetch_site.lower() == "cross-site"
-    ):
+    if fetch_site is not None and fetch_site.lower() == "cross-site":
         return False
 
     expected_origin = _request_origin(request)
@@ -126,8 +122,8 @@ def _csrf_request_is_allowed(
 
 @app.middleware("http")
 async def dashboard_csrf_protection(
-        request: Request,
-        call_next,
+    request: Request,
+    call_next,
 ) -> Response:
     """
     Reject cross-site state-changing requests targeting
@@ -138,19 +134,13 @@ async def dashboard_csrf_protection(
     """
 
     if (
-        request.method.upper()
-        not in SAFE_HTTP_METHODS
+        request.method.upper() not in SAFE_HTTP_METHODS
         and _is_dashboard_browser_path(request.url.path)
         and not _csrf_request_is_allowed(request)
     ):
         return JSONResponse(
             status_code=403,
-            content={
-                "detail": (
-                    "Cross-site dashboard "
-                    "request rejected."
-                )
-            },
+            content={"detail": ("Cross-site dashboard " "request rejected.")},
         )
 
     return await call_next(request)
@@ -158,8 +148,8 @@ async def dashboard_csrf_protection(
 
 @app.middleware("http")
 async def security_headers(
-        request: Request,
-        call_next,
+    request: Request,
+    call_next,
 ) -> Response:
     """
     Add baseline browser-security headers.
@@ -214,6 +204,7 @@ async def security_headers(
 
     return response
 
+
 app.include_router(analysis_router)
 app.include_router(auth_router)
 app.include_router(ai_reports_router)
@@ -221,6 +212,8 @@ app.include_router(cases_router)
 app.include_router(anomaly_router)
 app.include_router(workspace_router)
 app.include_router(dashboard_router)
+
+
 @app.get("/health")
 def health_check() -> dict[str, str]:
     return {

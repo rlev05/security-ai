@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Protocol
+
 from app.ai.schemas import AnalysisEvidence, InvestigationReportContent
+
 
 class AIProviderError(RuntimeError):
     """AI Provider error"""
@@ -20,11 +22,13 @@ class GeneratedInvestigationReport:
     model: str
     content: InvestigationReportContent
 
+
 class InvestigationReportProvider(Protocol):
     provider_name: str
     model_name: str
 
-    def generate_report(self,
-                        evidence: AnalysisEvidence,) -> GeneratedInvestigationReport:
+    def generate_report(
+        self,
+        evidence: AnalysisEvidence,
+    ) -> GeneratedInvestigationReport:
         """Generate a structure report from evidence"""
-

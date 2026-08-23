@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+
 from app.models.event import SecurityEvent
 from app.models.incident import Incident
 

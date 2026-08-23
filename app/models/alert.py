@@ -1,11 +1,13 @@
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+
 class Severity(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
+
 
 @dataclass(slots=True)
 class Alert:
@@ -22,4 +24,3 @@ class Alert:
     def __post_init__(self) -> None:
         if not 0.0 <= self.confidence <= 1.0:
             raise ValueError("Confidence must be between 0.0 and 1.0")
-

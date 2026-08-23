@@ -1,18 +1,26 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
+
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
+
 from app.models.analysis_record import AnalysisRecord
 from app.models.case import CaseSeverity, CaseStatus, CaseTimelineEventType
-from app.models.case_record import CaseRecord, CaseAnalysisLink, CaseNoteRecord, CaseTimelineEventRecord
+from app.models.case_record import (
+    CaseAnalysisLink,
+    CaseNoteRecord,
+    CaseRecord,
+    CaseTimelineEventRecord,
+)
 from app.models.user_record import UserRecord
+
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
 def _commit_and_refresh(
-        session: Session,
-        record,
+    session: Session,
+    record,
 ):
     """Commit a change and refresh the supplied ORM record"""
 
@@ -26,13 +34,13 @@ def _commit_and_refresh(
 
 
 def _add_timeline_event(
-        session: Session,
-        *,
-        case_id: str,
-        event_type: CaseTimelineEventType,
-        actor_user_id: str | None,
-        event_json: dict[str, object] | None = None,
-) ->  CaseTimelineEventRecord:
+    session: Session,
+    *,
+    case_id: str,
+    event_type: CaseTimelineEventType,
+    actor_user_id: str | None,
+    event_json: dict[str, object] | None = None,
+) -> CaseTimelineEventRecord:
     """Add an append-only event to a case timeline"""
 
     event = CaseTimelineEventRecord(
@@ -48,16 +56,15 @@ def _add_timeline_event(
 
 
 def create_case(
-        session: Session,
-        *,
-        title: str,
-        description: str | None,
-        severity: CaseSeverity,
-        created_by_user_id: str,
-        assigned_to_user_id: str | None = None,
+    session: Session,
+    *,
+    title: str,
+    description: str | None,
+    severity: CaseSeverity,
+    created_by_user_id: str,
+    assigned_to_user_id: str | None = None,
 ) -> CaseRecord:
     """CReate a new analyst case"""
-
 
     record = CaseRecord(
         title=title,
@@ -80,24 +87,22 @@ def create_case(
         event_json={
             "severity": severity.value,
             "assigned_to_user_id": assigned_to_user_id,
-        }
+        },
     )
 
     return _commit_and_refresh(session, record)
 
 
 def get_case(
-        session: Session,
-        *,
-        case_id: str,
-        user_id: str,
-        is_admin: bool,
+    session: Session,
+    *,
+    case_id: str,
+    user_id: str,
+    is_admin: bool,
 ) -> CaseRecord | None:
     """Return a case visible to the supplied user"""
 
-    statement = (
-        select(CaseRecord).where(CaseRecord.id == case_id)
-    )
+    statement = select(CaseRecord).where(CaseRecord.id == case_id)
 
     if not is_admin:
         statement = statement.where(
@@ -109,6 +114,7 @@ def get_case(
 
     return session.scalar(statement)
 
+
 def list_cases(
     session: Session,
     *,
@@ -116,17 +122,13 @@ def list_cases(
     is_admin: bool,
 ) -> list[CaseRecord]:
     """List cases visible to a user."""
-    statement = select(
-        CaseRecord
-    )
+    statement = select(CaseRecord)
 
     if not is_admin:
         statement = statement.where(
             or_(
-                CaseRecord.created_by_user_id
-                == user_id,
-                CaseRecord.assigned_to_user_id
-                == user_id,
+                CaseRecord.created_by_user_id == user_id,
+                CaseRecord.assigned_to_user_id == user_id,
             )
         )
 
@@ -135,17 +137,13 @@ def list_cases(
         CaseRecord.created_at.desc(),
     )
 
-    return list(
-        session.scalars(
-            statement
-        ).all()
-    )
+    return list(session.scalars(statement).all())
 
 
 def get_case_analyses(
-        session: Session,
-        *,
-        case_id: str,
+    session: Session,
+    *,
+    case_id: str,
 ) -> list[AnalysisRecord]:
     """Return analysis links for a case"""
 
@@ -163,9 +161,7 @@ def get_case_analyses(
         )
     )
 
-    return list(
-        session.scalars(statement).all()
-    )
+    return list(session.scalars(statement).all())
 
 
 def link_analysis_to_case(
@@ -180,18 +176,12 @@ def link_analysis_to_case(
     Returns None when the analysis is already linked.
     """
 
-    statement = select(
-        CaseAnalysisLink
-    ).where(
-        CaseAnalysisLink.case_id
-        == case_record.id,
-        CaseAnalysisLink.analysis_id
-        == analysis.id,
+    statement = select(CaseAnalysisLink).where(
+        CaseAnalysisLink.case_id == case_record.id,
+        CaseAnalysisLink.analysis_id == analysis.id,
     )
 
-    existing = session.scalar(
-        statement
-    )
+    existing = session.scalar(statement)
 
     if existing is not None:
         return None
@@ -207,24 +197,16 @@ def link_analysis_to_case(
     _add_timeline_event(
         session,
         case_id=case_record.id,
-        event_type=(
-            CaseTimelineEventType.ANALYSIS_LINKED
-        ),
+        event_type=(CaseTimelineEventType.ANALYSIS_LINKED),
         actor_user_id=actor_user_id,
         event_json={
             "analysis_id": analysis.id,
-            "source_type": (
-                analysis.source_type
-            ),
-            "source_name": (
-                analysis.source_name
-            ),
+            "source_type": (analysis.source_type),
+            "source_name": (analysis.source_name),
         },
     )
 
-    case_record.updated_at = (
-        _utc_now()
-    )
+    case_record.updated_at = _utc_now()
 
     try:
         session.commit()
@@ -239,11 +221,7 @@ def link_analysis_to_case(
 
 
 def add_case_note(
-        session: Session,
-        *,
-        case_record: CaseRecord,
-        author_user_id: str,
-        content: str
+    session: Session, *, case_record: CaseRecord, author_user_id: str, content: str
 ) -> CaseNoteRecord:
     """Append an analyst note to a case"""
 
@@ -264,7 +242,7 @@ def add_case_note(
         actor_user_id=author_user_id,
         event_json={
             "note_id": note.id,
-        }
+        },
     )
 
     case_record.updated_at = _utc_now()
@@ -280,9 +258,9 @@ def add_case_note(
 
 
 def list_case_notes(
-        session: Session,
-        *,
-        case_id: str,
+    session: Session,
+    *,
+    case_id: str,
 ) -> list[CaseNoteRecord]:
     """Return analyst notes for a case"""
 
@@ -296,9 +274,9 @@ def list_case_notes(
 
 
 def list_case_timeline(
-        session: Session,
-        *,
-        case_id: str,
+    session: Session,
+    *,
+    case_id: str,
 ) -> list[CaseTimelineEventRecord]:
     """Return the chronological event timeline"""
 
@@ -312,11 +290,11 @@ def list_case_timeline(
 
 
 def assign_case(
-        session: Session,
-        *,
-        case_record: CaseRecord,
-        actor_user_id: str,
-        assigned_to_user_id: str | None,
+    session: Session,
+    *,
+    case_record: CaseRecord,
+    actor_user_id: str,
+    assigned_to_user_id: str | None,
 ) -> CaseRecord:
     """Change the analyst assigned to a case"""
 
@@ -337,17 +315,18 @@ def assign_case(
         event_json={
             "previous_assigned_to_user_id": previous_assignee,
             "assigned_to_user_id": assigned_to_user_id,
-        }
+        },
     )
 
     return _commit_and_refresh(session, case_record)
 
+
 def set_case_status(
-        session: Session,
-        *,
-        case_record: CaseRecord,
-        actor_user_id: str,
-        new_status: CaseStatus
+    session: Session,
+    *,
+    case_record: CaseRecord,
+    actor_user_id: str,
+    new_status: CaseStatus,
 ) -> CaseRecord:
     """Change case workflow status"""
 
@@ -370,25 +349,23 @@ def set_case_status(
     _add_timeline_event(
         session,
         case_id=case_record.id,
-        event_type=(
-            CaseTimelineEventType.STATUS_CHANGED
-        ),
+        event_type=(CaseTimelineEventType.STATUS_CHANGED),
         actor_user_id=actor_user_id,
         event_json={
             "previous_status": previous_status,
             "status": new_status.value,
-        }
+        },
     )
 
     return _commit_and_refresh(session, case_record)
 
 
 def set_case_severity(
-        session: Session,
-        *,
-        case_record: CaseRecord,
-        actor_user_id: str,
-        new_severity: CaseSeverity
+    session: Session,
+    *,
+    case_record: CaseRecord,
+    actor_user_id: str,
+    new_severity: CaseSeverity,
 ) -> CaseRecord:
     """Change the severity assigned to a case"""
 
@@ -404,35 +381,23 @@ def set_case_severity(
     _add_timeline_event(
         session,
         case_id=case_record.id,
-        event_type=(
-            CaseTimelineEventType.SEVERITY_CHANGED
-        ),
+        event_type=(CaseTimelineEventType.SEVERITY_CHANGED),
         actor_user_id=actor_user_id,
         event_json={
             "previous_severity": previous_severity,
             "severity": new_severity.value,
-        }
+        },
     )
 
     return _commit_and_refresh(session, case_record)
 
 
-def get_active_user(
-        session: Session,
-        *,
-        user_id: str
-) -> UserRecord | None:
+def get_active_user(session: Session, *, user_id: str) -> UserRecord | None:
     """Return an active user that can be assigned to a case"""
 
-    statement = (
-        select(UserRecord)
-        .where(
-            UserRecord.id == user_id,
-            UserRecord.is_active.is_(True),
-        )
+    statement = select(UserRecord).where(
+        UserRecord.id == user_id,
+        UserRecord.is_active.is_(True),
     )
 
     return session.scalar(statement)
-
-
-

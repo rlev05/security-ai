@@ -9,9 +9,7 @@ def test_cross_site_origin_is_rejected(
     response = client.post(
         "/login",
         headers={
-            "Origin": (
-                "https://attacker.example"
-            ),
+            "Origin": ("https://attacker.example"),
         },
         data={
             "login": "nobody",
@@ -19,16 +17,10 @@ def test_cross_site_origin_is_rejected(
         },
     )
 
-    assert (
-        response.status_code
-        == 403
-    )
+    assert response.status_code == 403
 
     assert response.json() == {
-        "detail": (
-            "Cross-site dashboard "
-            "request rejected."
-        ),
+        "detail": ("Cross-site dashboard " "request rejected."),
     }
 
 
@@ -38,17 +30,12 @@ def test_cross_site_fetch_metadata_is_rejected(
     response = client.post(
         "/logout",
         headers={
-            "Sec-Fetch-Site": (
-                "cross-site"
-            ),
+            "Sec-Fetch-Site": ("cross-site"),
         },
         follow_redirects=False,
     )
 
-    assert (
-        response.status_code
-        == 403
-    )
+    assert response.status_code == 403
 
 
 def test_cross_site_referer_is_rejected(
@@ -57,10 +44,7 @@ def test_cross_site_referer_is_rejected(
     response = client.post(
         "/login",
         headers={
-            "Referer": (
-                "https://attacker.example/"
-                "malicious-form"
-            ),
+            "Referer": ("https://attacker.example/" "malicious-form"),
         },
         data={
             "login": "nobody",
@@ -68,10 +52,7 @@ def test_cross_site_referer_is_rejected(
         },
     )
 
-    assert (
-        response.status_code
-        == 403
-    )
+    assert response.status_code == 403
 
 
 def test_same_origin_request_is_allowed(
@@ -80,12 +61,8 @@ def test_same_origin_request_is_allowed(
     response = client.post(
         "/login",
         headers={
-            "Origin": (
-                "http://testserver"
-            ),
-            "Sec-Fetch-Site": (
-                "same-origin"
-            ),
+            "Origin": ("http://testserver"),
+            "Sec-Fetch-Site": ("same-origin"),
         },
         data={
             "login": "nobody",
@@ -95,10 +72,7 @@ def test_same_origin_request_is_allowed(
 
     # Authentication should fail normally.
     # The CSRF middleware must not reject it.
-    assert (
-        response.status_code
-        == 401
-    )
+    assert response.status_code == 401
 
 
 def test_bearer_api_is_not_subject_to_dashboard_csrf(
@@ -107,12 +81,8 @@ def test_bearer_api_is_not_subject_to_dashboard_csrf(
     response = client.post(
         "/auth/token",
         headers={
-            "Origin": (
-                "https://attacker.example"
-            ),
-            "Sec-Fetch-Site": (
-                "cross-site"
-            ),
+            "Origin": ("https://attacker.example"),
+            "Sec-Fetch-Site": ("cross-site"),
         },
         data={
             "username": "nobody",
@@ -122,7 +92,4 @@ def test_bearer_api_is_not_subject_to_dashboard_csrf(
 
     # The authentication endpoint may reject the credentials,
     # but it must not be rejected by dashboard CSRF middleware.
-    assert (
-        response.status_code
-        != 403
-    )
+    assert response.status_code != 403

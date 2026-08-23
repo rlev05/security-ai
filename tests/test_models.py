@@ -1,13 +1,12 @@
 from datetime import datetime
+
 from app.models.alert import Alert, Severity
-from app.models.event import SecurityEvent, EventType
+from app.models.event import EventType, SecurityEvent
 from app.models.incident import Incident
 
+
 def test_incident_contains_event_and_alert():
-    raw_log = (
-        "2026-08-01T12:00:00 "
-        "Failed password for admin from 192.168.1.5"
-    )
+    raw_log = "2026-08-01T12:00:00 " "Failed password for admin from 192.168.1.5"
 
     event = SecurityEvent(
         timestamp=datetime(2026, 8, 1, 12, 0),

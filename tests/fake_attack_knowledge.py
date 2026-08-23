@@ -1,10 +1,16 @@
 from datetime import datetime, timezone
-from app.knowledge.attack_repository import AttackKnowledgeRepository
-from app.knowledge.schemas import AttackDetectionStrategyKnowledge, AttackKnowledgeMetadata, AttackKnowledgeSnapshot, AttackMitigationKnowledge, AttackTechniqueKnowledge
 
-def build_fake_attack_repository() -> (
-    AttackKnowledgeRepository
-):
+from app.knowledge.attack_repository import AttackKnowledgeRepository
+from app.knowledge.schemas import (
+    AttackDetectionStrategyKnowledge,
+    AttackKnowledgeMetadata,
+    AttackKnowledgeSnapshot,
+    AttackMitigationKnowledge,
+    AttackTechniqueKnowledge,
+)
+
+
+def build_fake_attack_repository() -> AttackKnowledgeRepository:
     techniques = [
         AttackTechniqueKnowledge(
             technique_id="T1110.001",
@@ -20,37 +26,26 @@ def build_fake_attack_repository() -> (
                 "Linux",
                 "Windows",
             ],
-            source_url=(
-                "https://attack.mitre.org/"
-                "techniques/T1110/001"
-            ),
+            source_url=("https://attack.mitre.org/" "techniques/T1110/001"),
             mitigations=[
                 AttackMitigationKnowledge(
                     mitigation_id="M1032",
-                    name=(
-                        "Multi-factor Authentication"
-                    ),
+                    name=("Multi-factor Authentication"),
                     description=(
                         "Additional authentication factors "
                         "can reduce credential abuse risk."
                     ),
                     source_url=None,
                 )
-
             ],
             detection_strategies=[
                 AttackDetectionStrategyKnowledge(
                     strategy_id="DET0551",
-                    name=(
-                        "Password Guessing Detection"
-                    ),
-                    description=(
-                        "Correlate repeated authentication "
-                        "failures."
-                    ),
+                    name=("Password Guessing Detection"),
+                    description=("Correlate repeated authentication " "failures."),
                     source_url=None,
                 )
-            ]
+            ],
         ),
         AttackTechniqueKnowledge(
             technique_id="T1110.003",
@@ -66,10 +61,7 @@ def build_fake_attack_repository() -> (
                 "Linux",
                 "Windows",
             ],
-            source_url=(
-                "https://attack.mitre.org/"
-                "techniques/T1110/003/"
-            ),
+            source_url=("https://attack.mitre.org/" "techniques/T1110/003/"),
         ),
         AttackTechniqueKnowledge(
             technique_id="T1078",
@@ -82,16 +74,13 @@ def build_fake_attack_repository() -> (
                 "Defense Evasion",
                 "Initial Access",
                 "Persistence",
-                "Privilege Escalation"
+                "Privilege Escalation",
             ],
             platforms=[
                 "Linux",
                 "Windows",
             ],
-            source_url=(
-                "https://attack.mitre.org/"
-                "techniques/T1078"
-            ),
+            source_url=("https://attack.mitre.org/" "techniques/T1078"),
         ),
     ]
 
@@ -107,5 +96,3 @@ def build_fake_attack_repository() -> (
     )
 
     return AttackKnowledgeRepository(snapshot)
-
-

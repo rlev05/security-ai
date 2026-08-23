@@ -1,16 +1,42 @@
 from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+
 from app.api.auth_dependencies import get_current_user
-from app.api.case_schemas import CaseAnalysisLinkRequest, CaseAnalysisResponse, CaseAssignmentRequest, CaseCreateRequest, CaseDetailResponse, CaseNoteCreateRequest, CaseNoteResponse, CaseResponse, CaseSeverityUpdateRequest, CaseStatusUpdateRequest, CaseTimelineEventResponse
+from app.api.case_schemas import (
+    CaseAnalysisLinkRequest,
+    CaseAnalysisResponse,
+    CaseAssignmentRequest,
+    CaseCreateRequest,
+    CaseDetailResponse,
+    CaseNoteCreateRequest,
+    CaseNoteResponse,
+    CaseResponse,
+    CaseSeverityUpdateRequest,
+    CaseStatusUpdateRequest,
+    CaseTimelineEventResponse,
+)
 from app.core.database import get_database_session
 from app.models.case import CaseSeverity, CaseStatus
 from app.models.case_record import CaseRecord
 from app.models.user import UserRole
 from app.models.user_record import UserRecord
 from app.services.analysis_history_service import get_analysis_record
-from app.services.case_service import add_case_note, assign_case, create_case, get_active_user, get_case, get_case_analyses, link_analysis_to_case, list_case_notes, list_case_timeline, list_cases, set_case_severity, set_case_status
-
+from app.services.case_service import (
+    add_case_note,
+    assign_case,
+    create_case,
+    get_active_user,
+    get_case,
+    get_case_analyses,
+    link_analysis_to_case,
+    list_case_notes,
+    list_case_timeline,
+    list_cases,
+    set_case_severity,
+    set_case_status,
+)
 
 router = APIRouter(
     prefix="/cases",
@@ -27,15 +53,13 @@ CurrentUser = Annotated[
     Depends(get_current_user),
 ]
 
+
 def is_admin(
     current_user: UserRecord,
 ) -> bool:
     """Return whether the authenticated user is an administrator."""
 
-    return (
-        current_user.role
-        == UserRole.ADMIN.value
-    )
+    return current_user.role == UserRole.ADMIN.value
 
 
 def require_visible_case(
@@ -50,16 +74,12 @@ def require_visible_case(
         session,
         case_id=case_id,
         user_id=current_user.id,
-        is_admin=is_admin(
-            current_user
-        ),
+        is_admin=is_admin(current_user),
     )
 
     if record is None:
         raise HTTPException(
-            status_code=(
-                status.HTTP_404_NOT_FOUND
-            ),
+            status_code=(status.HTTP_404_NOT_FOUND),
             detail="Case not found",
         )
 
@@ -75,18 +95,10 @@ def build_case_response(
         case_id=record.id,
         title=record.title,
         description=record.description,
-        severity=CaseSeverity(
-            record.severity
-        ),
-        status=CaseStatus(
-            record.status
-        ),
-        created_by_user_id=(
-            record.created_by_user_id
-        ),
-        assigned_to_user_id=(
-            record.assigned_to_user_id
-        ),
+        severity=CaseSeverity(record.severity),
+        status=CaseStatus(record.status),
+        created_by_user_id=(record.created_by_user_id),
+        assigned_to_user_id=(record.assigned_to_user_id),
         created_at=record.created_at,
         updated_at=record.updated_at,
         closed_at=record.closed_at,
@@ -114,65 +126,39 @@ def build_case_detail_response(
         case_id=record.id,
     )
 
-    base = build_case_response(
-        record
-    )
+    base = build_case_response(record)
 
     return CaseDetailResponse(
         **base.model_dump(),
         analyses=[
             CaseAnalysisResponse(
                 analysis_id=analysis.id,
-                source_type=(
-                    analysis.source_type
-                ),
-                source_name=(
-                    analysis.source_name
-                ),
-                total_lines=(
-                    analysis.total_lines
-                ),
-                ignored_lines=(
-                    analysis.ignored_lines
-                ),
-                event_count=(
-                    analysis.event_count
-                ),
-                incident_count=(
-                    analysis.incident_count
-                ),
-                created_at=(
-                    analysis.created_at
-                ),
+                source_type=(analysis.source_type),
+                source_name=(analysis.source_name),
+                total_lines=(analysis.total_lines),
+                ignored_lines=(analysis.ignored_lines),
+                event_count=(analysis.event_count),
+                incident_count=(analysis.incident_count),
+                created_at=(analysis.created_at),
             )
             for analysis in analyses
         ],
         notes=[
             CaseNoteResponse(
                 note_id=note.id,
-                author_user_id=(
-                    note.author_user_id
-                ),
+                author_user_id=(note.author_user_id),
                 content=note.content,
-                created_at=(
-                    note.created_at
-                ),
+                created_at=(note.created_at),
             )
             for note in notes
         ],
         timeline=[
             CaseTimelineEventResponse(
                 event_id=event.id,
-                event_type=(
-                    event.event_type
-                ),
-                actor_user_id=(
-                    event.actor_user_id
-                ),
+                event_type=(event.event_type),
+                actor_user_id=(event.actor_user_id),
                 event=event.event_json,
-                created_at=(
-                    event.created_at
-                ),
+                created_at=(event.created_at),
             )
             for event in timeline
         ],
@@ -182,9 +168,7 @@ def build_case_detail_response(
 @router.post(
     "",
     response_model=CaseResponse,
-    status_code=(
-        status.HTTP_201_CREATED
-    ),
+    status_code=(status.HTTP_201_CREATED),
 )
 def create_analyst_case(
     request: CaseCreateRequest,
@@ -193,26 +177,16 @@ def create_analyst_case(
 ) -> CaseResponse:
     """Create a new analyst investigation case."""
 
-    if (
-        request.assigned_to_user_id
-        is not None
-    ):
+    if request.assigned_to_user_id is not None:
         assignee = get_active_user(
             session,
-            user_id=(
-                request.assigned_to_user_id
-            ),
+            user_id=(request.assigned_to_user_id),
         )
 
         if assignee is None:
             raise HTTPException(
-                status_code=(
-                    status.HTTP_400_BAD_REQUEST
-                ),
-                detail=(
-                    "Assigned user does not exist "
-                    "or is inactive"
-                ),
+                status_code=(status.HTTP_400_BAD_REQUEST),
+                detail=("Assigned user does not exist " "or is inactive"),
             )
 
     record = create_case(
@@ -220,17 +194,11 @@ def create_analyst_case(
         title=request.title,
         description=request.description,
         severity=request.severity,
-        created_by_user_id=(
-            current_user.id
-        ),
-        assigned_to_user_id=(
-            request.assigned_to_user_id
-        ),
+        created_by_user_id=(current_user.id),
+        assigned_to_user_id=(request.assigned_to_user_id),
     )
 
-    return build_case_response(
-        record
-    )
+    return build_case_response(record)
 
 
 @router.get(
@@ -246,17 +214,10 @@ def get_cases(
     records = list_cases(
         session,
         user_id=current_user.id,
-        is_admin=is_admin(
-            current_user
-        ),
+        is_admin=is_admin(current_user),
     )
 
-    return [
-        build_case_response(
-            record
-        )
-        for record in records
-    ]
+    return [build_case_response(record) for record in records]
 
 
 @router.get(
@@ -300,11 +261,7 @@ def link_analysis(
         current_user=current_user,
     )
 
-    owner_user_id = (
-        None
-        if is_admin(current_user)
-        else current_user.id
-    )
+    owner_user_id = None if is_admin(current_user) else current_user.id
 
     analysis = get_analysis_record(
         session,
@@ -314,32 +271,21 @@ def link_analysis(
 
     if analysis is None:
         raise HTTPException(
-            status_code=(
-                status.HTTP_404_NOT_FOUND
-            ),
-            detail=(
-                "Analysis record not found"
-            ),
+            status_code=(status.HTTP_404_NOT_FOUND),
+            detail=("Analysis record not found"),
         )
 
     link = link_analysis_to_case(
         session,
         case_record=case_record,
         analysis=analysis,
-        actor_user_id=(
-            current_user.id
-        ),
+        actor_user_id=(current_user.id),
     )
 
     if link is None:
         raise HTTPException(
-            status_code=(
-                status.HTTP_409_CONFLICT
-            ),
-            detail=(
-                "Analysis is already linked "
-                "to this case"
-            ),
+            status_code=(status.HTTP_409_CONFLICT),
+            detail=("Analysis is already linked " "to this case"),
         )
 
     return build_case_detail_response(
@@ -351,9 +297,7 @@ def link_analysis(
 @router.post(
     "/{case_id}/notes",
     response_model=CaseNoteResponse,
-    status_code=(
-        status.HTTP_201_CREATED
-    ),
+    status_code=(status.HTTP_201_CREATED),
 )
 def create_case_note(
     case_id: str,
@@ -372,17 +316,13 @@ def create_case_note(
     note = add_case_note(
         session,
         case_record=case_record,
-        author_user_id=(
-            current_user.id
-        ),
+        author_user_id=(current_user.id),
         content=request.content,
     )
 
     return CaseNoteResponse(
         note_id=note.id,
-        author_user_id=(
-            note.author_user_id
-        ),
+        author_user_id=(note.author_user_id),
         content=note.content,
         created_at=note.created_at,
     )
@@ -406,42 +346,26 @@ def update_case_assignment(
         current_user=current_user,
     )
 
-    if (
-        request.assigned_to_user_id
-        is not None
-    ):
+    if request.assigned_to_user_id is not None:
         assignee = get_active_user(
             session,
-            user_id=(
-                request.assigned_to_user_id
-            ),
+            user_id=(request.assigned_to_user_id),
         )
 
         if assignee is None:
             raise HTTPException(
-                status_code=(
-                    status.HTTP_400_BAD_REQUEST
-                ),
-                detail=(
-                    "Assigned user does not exist "
-                    "or is inactive"
-                ),
+                status_code=(status.HTTP_400_BAD_REQUEST),
+                detail=("Assigned user does not exist " "or is inactive"),
             )
 
     updated = assign_case(
         session,
         case_record=case_record,
-        actor_user_id=(
-            current_user.id
-        ),
-        assigned_to_user_id=(
-            request.assigned_to_user_id
-        ),
+        actor_user_id=(current_user.id),
+        assigned_to_user_id=(request.assigned_to_user_id),
     )
 
-    return build_case_response(
-        updated
-    )
+    return build_case_response(updated)
 
 
 @router.patch(
@@ -465,15 +389,11 @@ def update_case_status(
     updated = set_case_status(
         session,
         case_record=case_record,
-        actor_user_id=(
-            current_user.id
-        ),
+        actor_user_id=(current_user.id),
         new_status=request.status,
     )
 
-    return build_case_response(
-        updated
-    )
+    return build_case_response(updated)
 
 
 @router.patch(
@@ -497,12 +417,8 @@ def update_case_severity(
     updated = set_case_severity(
         session,
         case_record=case_record,
-        actor_user_id=(
-            current_user.id
-        ),
+        actor_user_id=(current_user.id),
         new_severity=request.severity,
     )
 
-    return build_case_response(
-        updated
-    )
+    return build_case_response(updated)

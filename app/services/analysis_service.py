@@ -1,25 +1,23 @@
 from app.detection.auth_log_parser import parse_auth_log_line
 from app.detection.brute_force_detector import detect_brute_force
 from app.detection.credential_compromise_detector import detect_success_after_failures
-from app.detection.password_spray_detector import (detect_password_spraying,)
+from app.detection.password_spray_detector import (
+    detect_password_spraying,
+)
 from app.models.analysis import AnalysisResult
 from app.models.event import SecurityEvent
 
 
 def analyse_auth_log(
-        content: str,
-        default_year: int | None = None,
+    content: str,
+    default_year: int | None = None,
 ) -> AnalysisResult:
     """Parse the authentication log and run all the detection rules"""
 
     if not content.strip():
         raise ValueError("Log content cannot be empty")
 
-    lines = [
-        line.strip()
-        for line in content.splitlines()
-        if line.strip()
-    ]
+    lines = [line.strip() for line in content.splitlines() if line.strip()]
 
     events: list[SecurityEvent] = []
     ignored_lines = 0
