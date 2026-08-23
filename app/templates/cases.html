@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>{{ page_title }}</title>
+
+    <link
+        rel="stylesheet"
+        href="/static/css/dashboard.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/static/css/cases.css"
+    >
+</head>
+
+<body>
+
+<div class="app-shell">
+
+    <aside class="sidebar">
+
+        <div class="brand">
+            SECURITY AI
+        </div>
+
+        <nav class="navigation">
+
+            <a
+                href="/dashboard"
+                class="navigation-item"
+            >
+                Dashboard
+            </a>
+
+            <a
+                href="/dashboard"
+                class="navigation-item"
+            >
+                Analyses
+            </a>
+
+            <a
+                href="/dashboard/cases"
+                class="navigation-item active"
+            >
+                Cases
+            </a>
+
+        </nav>
+
+        <div class="sidebar-footer">
+
+            <div class="signed-in-user">
+
+                <span class="signed-in-label">
+                    Signed in as
+                </span>
+
+                <strong>
+                    {{ current_user.username }}
+                </strong>
+
+            </div>
+
+            <form
+                method="post"
+                action="/logout"
+            >
+                <button
+                    class="logout-button"
+                    type="submit"
+                >
+                    Sign out
+                </button>
+            </form>
+
+        </div>
+
+    </aside>
+
+
+    <main class="main-content">
+
+        <header class="topbar">
+
+            <div>
+
+                <div class="eyebrow">
+                    CASE MANAGEMENT
+                </div>
+
+                <h1>
+                    Investigation Cases
+                </h1>
+
+                <p class="subtitle">
+                    Track analyst investigations,
+                    evidence and response activity.
+                </p>
+
+            </div>
+
+        </header>
+
+
+        <section class="metrics">
+
+            <article class="metric-card">
+
+                <span class="metric-label">
+                    Visible Cases
+                </span>
+
+                <strong class="metric-value">
+                    {{ cases | length }}
+                </strong>
+
+            </article>
+
+            <article class="metric-card">
+
+                <span class="metric-label">
+                    Active Cases
+                </span>
+
+                <strong class="metric-value">
+                    {{ open_count }}
+                </strong>
+
+            </article>
+
+            <article class="metric-card">
+
+                <span class="metric-label">
+                    Critical
+                </span>
+
+                <strong
+                    class="metric-value
+                    {% if critical_count %}
+                        metric-danger
+                    {% endif %}"
+                >
+                    {{ critical_count }}
+                </strong>
+
+            </article>
+
+        </section>
+
+
+        <section class="case-layout">
+
+            <section class="workspace-card">
+
+                <div class="workspace-heading">
+
+                    <div>
+
+                        <div class="section-kicker">
+                            CASE QUEUE
+                        </div>
+
+                        <h2>
+                            Cases
+                        </h2>
+
+                    </div>
+
+                    <span class="count-badge">
+                        {{ cases | length }}
+                    </span>
+
+                </div>
+
+
+                {% if cases %}
+
+                    <div class="case-list">
+
+                        {% for case in cases %}
+
+                            <a
+                                href="/dashboard/cases/{{ case.id }}"
+                                class="case-list-item"
+                            >
+
+                                <div class="case-main">
+
+                                    <div class="case-title-row">
+
+                                        <strong>
+                                            {{ case.title }}
+                                        </strong>
+
+                                        <span
+                                            class="severity-badge severity-{{ case.severity }}"
+                                        >
+                                            {{ case.severity }}
+                                        </span>
+
+                                    </div>
+
+                                    {% if case.description %}
+
+                                        <p>
+                                            {{ case.description }}
+                                        </p>
+
+                                    {% endif %}
+
+                                    <div class="case-meta">
+
+                                        <span>
+                                            Updated
+                                            {{
+                                                case.updated_at.strftime(
+                                                    "%Y-%m-%d %H:%M"
+                                                )
+                                            }}
+                                        </span>
+
+                                        {% if case.assigned_to_user_id %}
+
+                                            <span>
+                                                Assigned
+                                            </span>
+
+                                        {% else %}
+
+                                            <span>
+                                                Unassigned
+                                            </span>
+
+                                        {% endif %}
+
+                                    </div>
+
+                                </div>
+
+                                <span
+                                    class="case-status-badge status-{{ case.status }}"
+                                >
+                                    {{
+                                        case.status
+                                        | replace("_", " ")
+                                    }}
+                                </span>
+
+                            </a>
+
+                        {% endfor %}
+
+                    </div>
+
+                {% else %}
+
+                    <div class="section-empty">
+
+                        <strong>
+                            No investigation cases yet
+                        </strong>
+
+                        <p>
+                            Create one below or create
+                            a case directly from an
+                            analysis workspace.
+                        </p>
+
+                    </div>
+
+                {% endif %}
+
+            </section>
+
+
+            <aside class="workspace-card">
+
+                <div class="workspace-heading">
+
+                    <div>
+
+                        <div class="section-kicker">
+                            NEW CASE
+                        </div>
+
+                        <h2>
+                            Create Case
+                        </h2>
+
+                    </div>
+
+                </div>
+
+                <form
+                    class="standalone-case-form"
+                    method="post"
+                    action="/dashboard/cases/create"
+                >
+
+                    <label for="title">
+                        Case title
+                    </label>
+
+                    <input
+                        id="title"
+                        name="title"
+                        type="text"
+                        maxlength="200"
+                        required
+                    >
+
+                    <label for="description">
+                        Description
+                    </label>
+
+                    <textarea
+                        id="description"
+                        name="description"
+                        maxlength="10000"
+                        rows="6"
+                    ></textarea>
+
+                    <label for="severity">
+                        Severity
+                    </label>
+
+                    <select
+                        id="severity"
+                        name="severity"
+                    >
+
+                        <option value="low">
+                            Low
+                        </option>
+
+                        <option
+                            value="medium"
+                            selected
+                        >
+                            Medium
+                        </option>
+
+                        <option value="high">
+                            High
+                        </option>
+
+                        <option value="critical">
+                            Critical
+                        </option>
+
+                    </select>
+
+                    <button
+                        type="submit"
+                        class="primary-button"
+                    >
+                        Create case
+                    </button>
+
+                </form>
+
+            </aside>
+
+        </section>
+
+    </main>
+
+</div>
+
+</body>
+
+</html>

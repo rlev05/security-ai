@@ -1,0 +1,530 @@
+<div id="case-detail-content">
+
+    {% if action_message %}
+
+        <div class="action-message">
+            {{ action_message }}
+        </div>
+
+    {% endif %}
+
+
+    {% if action_error %}
+
+        <div class="action-error">
+            {{ action_error }}
+        </div>
+
+    {% endif %}
+
+
+    <section class="case-control-grid">
+
+        <div class="case-control-card">
+
+            <span class="control-label">
+                Status
+            </span>
+
+            <form
+                hx-post="/dashboard/cases/{{ case.id }}/actions/status"
+                hx-target="#case-detail-content"
+                hx-swap="outerHTML"
+            >
+
+                <select name="status">
+
+                    {% for status in case_statuses %}
+
+                        <option
+                            value="{{ status.value }}"
+                            {% if case.status == status.value %}
+                                selected
+                            {% endif %}
+                        >
+                            {{
+                                status.value
+                                | replace("_", " ")
+                                | title
+                            }}
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+                <button
+                    class="secondary-button"
+                    type="submit"
+                >
+                    Update
+                </button>
+
+            </form>
+
+        </div>
+
+
+        <div class="case-control-card">
+
+            <span class="control-label">
+                Severity
+            </span>
+
+            <form
+                hx-post="/dashboard/cases/{{ case.id }}/actions/severity"
+                hx-target="#case-detail-content"
+                hx-swap="outerHTML"
+            >
+
+                <select name="severity">
+
+                    {% for severity in case_severities %}
+
+                        <option
+                            value="{{ severity.value }}"
+                            {% if case.severity == severity.value %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ severity.value | title }}
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+                <button
+                    class="secondary-button"
+                    type="submit"
+                >
+                    Update
+                </button>
+
+            </form>
+
+        </div>
+
+
+        <div class="case-control-card">
+
+            <span class="control-label">
+                Assignment
+            </span>
+
+            {% if case.assigned_to_user_id %}
+
+                <strong class="assignment-value">
+
+                    {% if case.assigned_to_user_id == current_user.id %}
+
+                        Assigned to you
+
+                    {% else %}
+
+                        Assigned analyst
+
+                    {% endif %}
+
+                </strong>
+
+                <span class="assignment-id">
+                    {{ case.assigned_to_user_id }}
+                </span>
+
+            {% else %}
+
+                <strong class="assignment-value">
+                    Unassigned
+                </strong>
+
+            {% endif %}
+
+
+            <div class="assignment-actions">
+
+                {% if case.assigned_to_user_id != current_user.id %}
+
+                    <button
+                        class="secondary-button"
+                        hx-post="/dashboard/cases/{{ case.id }}/actions/assign-self"
+                        hx-target="#case-detail-content"
+                        hx-swap="outerHTML"
+                    >
+                        Assign to me
+                    </button>
+
+                {% endif %}
+
+
+                {% if
+                    case.assigned_to_user_id
+                    and
+                    (
+                        case.created_by_user_id == current_user.id
+                        or
+                        current_user.role == "admin"
+                    )
+                %}
+
+                    <button
+                        class="secondary-button"
+                        hx-post="/dashboard/cases/{{ case.id }}/actions/unassign"
+                        hx-target="#case-detail-content"
+                        hx-swap="outerHTML"
+                    >
+                        Unassign
+                    </button>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+
+        <div class="case-control-card">
+
+            <span class="control-label">
+                Last Updated
+            </span>
+
+            <strong>
+                {{
+                    case.updated_at.strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
+                }}
+            </strong>
+
+            {% if case.closed_at %}
+
+                <span class="closed-time">
+                    Closed
+                    {{
+                        case.closed_at.strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        )
+                    }}
+                </span>
+
+            {% endif %}
+
+        </div>
+
+    </section>
+
+
+    {% if case.description %}
+
+        <section class="workspace-card case-description-card">
+
+            <div class="workspace-heading">
+
+                <div>
+
+                    <div class="section-kicker">
+                        SUMMARY
+                    </div>
+
+                    <h2>
+                        Case Description
+                    </h2>
+
+                </div>
+
+            </div>
+
+            <div class="case-description">
+                {{ case.description }}
+            </div>
+
+        </section>
+
+    {% endif %}
+
+
+    <section class="case-detail-grid">
+
+        <div class="case-detail-column">
+
+            <section class="workspace-card">
+
+                <div class="workspace-heading">
+
+                    <div>
+
+                        <div class="section-kicker">
+                            EVIDENCE
+                        </div>
+
+                        <h2>
+                            Linked Analyses
+                        </h2>
+
+                    </div>
+
+                    <span class="count-badge">
+                        {{ analyses | length }}
+                    </span>
+
+                </div>
+
+
+                {% if analyses %}
+
+                    <div class="case-analysis-list">
+
+                        {% for analysis in analyses %}
+
+                            <a
+                                href="/dashboard/analysis/{{ analysis.id }}"
+                                class="case-analysis"
+                            >
+
+                                <div>
+
+                                    <strong>
+                                        {{
+                                            analysis.source_name
+                                            or
+                                            "Pasted authentication log"
+                                        }}
+                                    </strong>
+
+                                    <span>
+                                        {{ analysis.source_type }}
+                                    </span>
+
+                                </div>
+
+
+                                <div class="analysis-stats">
+
+                                    <span>
+                                        {{ analysis.event_count }}
+                                        events
+                                    </span>
+
+                                    <span>
+                                        {{ analysis.incident_count }}
+                                        incidents
+                                    </span>
+
+                                </div>
+
+
+                                <span class="investigate-link">
+                                    Investigate →
+                                </span>
+
+                            </a>
+
+                        {% endfor %}
+
+                    </div>
+
+                {% else %}
+
+                    <div class="section-empty">
+
+                        <strong>
+                            No analyses linked
+                        </strong>
+
+                        <p>
+                            Link an analysis from its
+                            investigation workspace.
+                        </p>
+
+                    </div>
+
+                {% endif %}
+
+            </section>
+
+
+            <section class="workspace-card">
+
+                <div class="workspace-heading">
+
+                    <div>
+
+                        <div class="section-kicker">
+                            ANALYST COLLABORATION
+                        </div>
+
+                        <h2>
+                            Notes
+                        </h2>
+
+                    </div>
+
+                    <span class="count-badge">
+                        {{ notes | length }}
+                    </span>
+
+                </div>
+
+
+                <form
+                    class="case-note-form"
+                    hx-post="/dashboard/cases/{{ case.id }}/actions/note"
+                    hx-target="#case-detail-content"
+                    hx-swap="outerHTML"
+                >
+
+                    <textarea
+                        name="content"
+                        rows="4"
+                        maxlength="20000"
+                        placeholder="Add an analyst note..."
+                        required
+                    ></textarea>
+
+                    <button
+                        type="submit"
+                        class="primary-button"
+                    >
+                        Add note
+                    </button>
+
+                </form>
+
+
+                {% if notes %}
+
+                    <div class="note-list">
+
+                        {% for note in notes %}
+
+                            <article class="note-card">
+
+                                <div class="note-meta">
+
+                                    <span>
+                                        Analyst
+                                        {{
+                                            note.author_user_id
+                                            or
+                                            "unknown"
+                                        }}
+                                    </span>
+
+                                    <span>
+                                        {{
+                                            note.created_at.strftime(
+                                                "%Y-%m-%d %H:%M:%S"
+                                            )
+                                        }}
+                                    </span>
+
+                                </div>
+
+                                <p>
+                                    {{ note.content }}
+                                </p>
+
+                            </article>
+
+                        {% endfor %}
+
+                    </div>
+
+                {% endif %}
+
+            </section>
+
+        </div>
+
+
+        <div class="case-detail-column">
+
+            <section class="workspace-card">
+
+                <div class="workspace-heading">
+
+                    <div>
+
+                        <div class="section-kicker">
+                            AUDIT TRAIL
+                        </div>
+
+                        <h2>
+                            Timeline
+                        </h2>
+
+                    </div>
+
+                    <span class="count-badge">
+                        {{ timeline | length }}
+                    </span>
+
+                </div>
+
+
+                {% if timeline %}
+
+                    <div class="timeline">
+
+                        {% for event in timeline %}
+
+                            <article class="timeline-event">
+
+                                <div class="timeline-marker"></div>
+
+                                <div class="timeline-content">
+
+                                    <strong>
+                                        {{
+                                            event.event_type
+                                            | replace("_", " ")
+                                            | title
+                                        }}
+                                    </strong>
+
+                                    <span>
+                                        {{
+                                            event.created_at.strftime(
+                                                "%Y-%m-%d %H:%M:%S"
+                                            )
+                                        }}
+                                    </span>
+
+                                    {% if event.event_json %}
+
+                                        <details class="evidence-details">
+
+                                            <summary>
+                                                Event details
+                                            </summary>
+
+                                            <pre>{{ event.event_json | tojson(indent=2) }}</pre>
+
+                                        </details>
+
+                                    {% endif %}
+
+                                </div>
+
+                            </article>
+
+                        {% endfor %}
+
+                    </div>
+
+                {% else %}
+
+                    <div class="section-empty">
+                        No timeline events.
+                    </div>
+
+                {% endif %}
+
+            </section>
+
+        </div>
+
+    </section>
+
+</div>

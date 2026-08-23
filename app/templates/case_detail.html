@@ -16,6 +16,11 @@
         href="/static/css/dashboard.css"
     >
 
+    <link
+        rel="stylesheet"
+        href="/static/css/cases.css"
+    >
+
     <script
         src="https://unpkg.com/htmx.org@2.0.4"
         defer
@@ -43,17 +48,17 @@
 
             <a
                 href="/dashboard"
-                class="navigation-item active"
+                class="navigation-item"
             >
                 Analyses
             </a>
 
             <a
-    href="/dashboard/cases"
-    class="navigation-item"
->
-    Cases
-</a>
+                href="/dashboard/cases"
+                class="navigation-item active"
+            >
+                Cases
+            </a>
 
         </nav>
 
@@ -76,8 +81,8 @@
                 action="/logout"
             >
                 <button
-                    type="submit"
                     class="logout-button"
+                    type="submit"
                 >
                     Sign out
                 </button>
@@ -87,44 +92,43 @@
 
     </aside>
 
+
     <main class="main-content">
 
         <div class="back-link-wrapper">
 
             <a
-                href="/dashboard"
+                href="/dashboard/cases"
                 class="back-link"
             >
-                ← Back to dashboard
+                ← Back to cases
             </a>
 
         </div>
+
 
         <header class="topbar">
 
             <div>
 
                 <div class="eyebrow">
-                    INVESTIGATION
+                    INVESTIGATION CASE
                 </div>
 
                 <h1>
-                    Authentication Analysis
+                    {{ case.title }}
                 </h1>
 
                 <p class="subtitle analysis-id">
-                    {{ analysis.id }}
+                    {{ case.id }}
                 </p>
 
             </div>
 
-            <div class="analysis-status">
-                Completed
-            </div>
-
         </header>
 
-        {% include "partials/workspace_content.html" %}
+
+        {% include "partials/case_detail_content.html" %}
 
     </main>
 

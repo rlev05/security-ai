@@ -29,7 +29,7 @@ def _add_timeline_event(
         session: Session,
         *,
         case_id: str,
-        event_type: CaseTimelineEventRecord,
+        event_type: CaseTimelineEventType,
         actor_user_id: str | None,
         event_json: dict[str, object] | None = None,
 ) ->  CaseTimelineEventRecord:
@@ -110,20 +110,23 @@ def get_case(
     return session.scalar(statement)
 
 def list_cases(
-        session: Session,
-        *,
-        user_id: str,
-        is_admin: bool,
+    session: Session,
+    *,
+    user_id: str,
+    is_admin: bool,
 ) -> list[CaseRecord]:
-    """List cases visible to a user"""
-
-    status = select(CaseRecord)
+    """List cases visible to a user."""
+    statement = select(
+        CaseRecord
+    )
 
     if not is_admin:
-        statement = status.where(
+        statement = statement.where(
             or_(
-                CaseRecord.created_by_user_id == user_id,
-                CaseRecord.assigned_to_user_id == user_id,
+                CaseRecord.created_by_user_id
+                == user_id,
+                CaseRecord.assigned_to_user_id
+                == user_id,
             )
         )
 
@@ -133,7 +136,9 @@ def list_cases(
     )
 
     return list(
-        session.scalars(statement).all()
+        session.scalars(
+            statement
+        ).all()
     )
 
 
@@ -141,7 +146,7 @@ def get_case_analyses(
         session: Session,
         *,
         case_id: str,
-) -> list[CaseAnalysisLink]:
+) -> list[AnalysisRecord]:
     """Return analysis links for a case"""
 
     statement = (

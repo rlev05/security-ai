@@ -13,7 +13,7 @@ from app.models.user import UserRole
 from app.models.user_record import UserRecord
 from app.services.analysis_history_service import get_analysis_record, list_analysis_records
 from app.services.anomaly_run_service import get_latest_anomaly_run, load_anomaly_result, save_anomaly_run
-from app.services.case_service import create_case, get_case, get_case_analyses, link_analysis_to_case, list_cases
+from app.services.case_service import create_case, get_case, get_case_analyses, link_analysis_to_case, list_cases, assign_case, list_case_notes, list_case_timeline, CaseStatus, add_case_note, set_case_status, set_case_severity
 from app.services.dashboard_service import get_dashboard_metrics
 from app.services.investigation_report_service import get_latest_investigation_report, fail_report, create_pending_report
 from app.services.security_service import create_access_token, decode_access_token
@@ -24,22 +24,18 @@ router = APIRouter(
     tags=["Dashboard"],
 )
 
-
 templates = Jinja2Templates(
     directory="app/templates",
 )
-
 
 DASHBOARD_COOKIE_NAME = (
     "security_ai_session"
 )
 
-
 DatabaseSession = Annotated[
     Session,
     Depends(get_database_session),
 ]
-
 
 ReportEnqueuer = Annotated[
     Callable[[str], None],
@@ -97,6 +93,26 @@ def _get_dashboard_user(
     return user
 
 
+def _require_dashboard_user(
+    request: Request,
+    session: Session,
+) -> UserRecord:
+    user = _get_dashboard_user(
+        request,
+        session,
+    )
+
+    if user is None:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_401_UNAUTHORIZED
+            ),
+            detail="Dashboard authentication required",
+        )
+
+    return user
+
+
 def _get_visible_analysis(
     session: Session,
     *,
@@ -120,6 +136,30 @@ def _get_visible_analysis(
         )
 
     return analysis
+
+
+def _get_visible_case(
+    session: Session,
+    *,
+    case_id: str,
+    user: UserRecord,
+):
+    case_record = get_case(
+        session,
+        case_id=case_id,
+        user_id=user.id,
+        is_admin=_is_admin(user),
+    )
+
+    if case_record is None:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+            ),
+            detail="Case not found",
+        )
+
+    return case_record
 
 
 def _normalise_event_list(
@@ -299,11 +339,9 @@ def _build_workspace_context(
         "incidents",
     )
 
-    anomaly_run = (
-        get_latest_anomaly_run(
-            session,
-            analysis_id=analysis.id,
-        )
+    anomaly_run = get_latest_anomaly_run(
+        session,
+        analysis_id=analysis.id,
     )
 
     anomaly_result = None
@@ -337,15 +375,11 @@ def _build_workspace_context(
         "events": events,
         "incidents": incidents,
         "anomaly_run": anomaly_run,
-        "anomaly_result": (
-            anomaly_result
-        ),
+        "anomaly_result": anomaly_result,
         "investigation_report": (
             investigation_report
         ),
-        "linked_cases": (
-            linked_cases
-        ),
+        "linked_cases": linked_cases,
         "available_cases": (
             available_cases
         ),
@@ -367,18 +401,12 @@ def _render_workspace_content(
     action_message: str | None = None,
     action_error: str | None = None,
 ) -> Response:
-    context = (
-        _build_workspace_context(
-            session,
-            analysis=analysis,
-            user=user,
-            action_message=(
-                action_message
-            ),
-            action_error=(
-                action_error
-            ),
-        )
+    context = _build_workspace_context(
+        session,
+        analysis=analysis,
+        user=user,
+        action_message=action_message,
+        action_error=action_error,
     )
 
     return templates.TemplateResponse(
@@ -386,6 +414,77 @@ def _render_workspace_content(
         name=(
             "partials/"
             "workspace_content.html"
+        ),
+        context=context,
+    )
+
+
+def _build_case_context(
+    session: Session,
+    *,
+    case_record,
+    user: UserRecord,
+    action_message: str | None = None,
+    action_error: str | None = None,
+) -> dict[str, Any]:
+    analyses = get_case_analyses(
+        session,
+        case_id=case_record.id,
+    )
+
+    notes = list_case_notes(
+        session,
+        case_id=case_record.id,
+    )
+
+    timeline = list_case_timeline(
+        session,
+        case_id=case_record.id,
+    )
+
+    return {
+        "current_user": user,
+        "case": case_record,
+        "analyses": analyses,
+        "notes": notes,
+        "timeline": timeline,
+        "case_statuses": list(
+            CaseStatus
+        ),
+        "case_severities": list(
+            CaseSeverity
+        ),
+        "action_message": (
+            action_message
+        ),
+        "action_error": (
+            action_error
+        ),
+    }
+
+
+def _render_case_content(
+    request: Request,
+    session: Session,
+    *,
+    case_record,
+    user: UserRecord,
+    action_message: str | None = None,
+    action_error: str | None = None,
+) -> Response:
+    context = _build_case_context(
+        session,
+        case_record=case_record,
+        user=user,
+        action_message=action_message,
+        action_error=action_error,
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name=(
+            "partials/"
+            "case_detail_content.html"
         ),
         context=context,
     )
@@ -605,12 +704,10 @@ def analysis_workspace(
         user=user,
     )
 
-    context = (
-        _build_workspace_context(
-            session,
-            analysis=analysis,
-            user=user,
-        )
+    context = _build_workspace_context(
+        session,
+        analysis=analysis,
+        user=user,
     )
 
     context["page_title"] = (
@@ -633,18 +730,10 @@ def workspace_content(
     request: Request,
     session: DatabaseSession,
 ) -> Response:
-    user = _get_dashboard_user(
+    user = _require_dashboard_user(
         request,
         session,
     )
-
-    if user is None:
-        return RedirectResponse(
-            url="/login",
-            status_code=(
-                status.HTTP_303_SEE_OTHER
-            ),
-        )
 
     analysis = _get_visible_analysis(
         session,
@@ -669,18 +758,10 @@ def dashboard_run_anomaly(
     request: Request,
     session: DatabaseSession,
 ) -> Response:
-    user = _get_dashboard_user(
+    user = _require_dashboard_user(
         request,
         session,
     )
-
-    if user is None:
-        return RedirectResponse(
-            url="/login",
-            status_code=(
-                status.HTTP_303_SEE_OTHER
-            ),
-        )
 
     analysis = _get_visible_analysis(
         session,
@@ -737,18 +818,10 @@ def dashboard_generate_report(
     session: DatabaseSession,
     enqueue_report: ReportEnqueuer,
 ) -> Response:
-    user = _get_dashboard_user(
+    user = _require_dashboard_user(
         request,
         session,
     )
-
-    if user is None:
-        return RedirectResponse(
-            url="/login",
-            status_code=(
-                status.HTTP_303_SEE_OTHER
-            ),
-        )
 
     analysis = _get_visible_analysis(
         session,
@@ -837,18 +910,10 @@ def dashboard_link_case(
         Form(),
     ],
 ) -> Response:
-    user = _get_dashboard_user(
+    user = _require_dashboard_user(
         request,
         session,
     )
-
-    if user is None:
-        return RedirectResponse(
-            url="/login",
-            status_code=(
-                status.HTTP_303_SEE_OTHER
-            ),
-        )
 
     analysis = _get_visible_analysis(
         session,
@@ -926,18 +991,10 @@ def dashboard_create_case(
         Form(),
     ] = CaseSeverity.MEDIUM,
 ) -> Response:
-    user = _get_dashboard_user(
+    user = _require_dashboard_user(
         request,
         session,
     )
-
-    if user is None:
-        return RedirectResponse(
-            url="/login",
-            status_code=(
-                status.HTTP_303_SEE_OTHER
-            ),
-        )
 
     analysis = _get_visible_analysis(
         session,
@@ -972,5 +1029,426 @@ def dashboard_create_case(
         action_message=(
             f"Case '{case_record.title}' "
             "created and linked."
+        ),
+    )
+
+
+@router.get(
+    "/dashboard/cases",
+    response_class=HTMLResponse,
+)
+def dashboard_cases(
+    request: Request,
+    session: DatabaseSession,
+) -> Response:
+    user = _get_dashboard_user(
+        request,
+        session,
+    )
+
+    if user is None:
+        return RedirectResponse(
+            url="/login",
+            status_code=(
+                status.HTTP_303_SEE_OTHER
+            ),
+        )
+
+    records = list_cases(
+        session,
+        user_id=user.id,
+        is_admin=_is_admin(user),
+    )
+
+    open_count = sum(
+        1
+        for record in records
+        if record.status
+        not in {
+            CaseStatus.RESOLVED.value,
+            CaseStatus.CLOSED.value,
+        }
+    )
+
+    critical_count = sum(
+        1
+        for record in records
+        if record.severity
+        == CaseSeverity.CRITICAL.value
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="cases.html",
+        context={
+            "page_title": (
+                "Security Cases"
+            ),
+            "current_user": user,
+            "cases": records,
+            "open_count": open_count,
+            "critical_count": (
+                critical_count
+            ),
+        },
+    )
+
+
+@router.post(
+    "/dashboard/cases/create",
+)
+def dashboard_create_standalone_case(
+    request: Request,
+    session: DatabaseSession,
+    title: Annotated[
+        str,
+        Form(
+            min_length=1,
+            max_length=200,
+        ),
+    ],
+    description: Annotated[
+        str | None,
+        Form(
+            max_length=10_000,
+        ),
+    ] = None,
+    severity: Annotated[
+        CaseSeverity,
+        Form(),
+    ] = CaseSeverity.MEDIUM,
+) -> Response:
+    user = _get_dashboard_user(
+        request,
+        session,
+    )
+
+    if user is None:
+        return RedirectResponse(
+            url="/login",
+            status_code=(
+                status.HTTP_303_SEE_OTHER
+            ),
+        )
+
+    clean_description = (
+        description.strip()
+        if description
+        else None
+    )
+
+    case_record = create_case(
+        session,
+        title=title,
+        description=clean_description,
+        severity=severity,
+        created_by_user_id=user.id,
+        assigned_to_user_id=None,
+    )
+
+    return RedirectResponse(
+        url=(
+            f"/dashboard/cases/"
+            f"{case_record.id}"
+        ),
+        status_code=(
+            status.HTTP_303_SEE_OTHER
+        ),
+    )
+
+
+@router.get(
+    "/dashboard/cases/{case_id}",
+    response_class=HTMLResponse,
+)
+def dashboard_case_detail(
+    case_id: str,
+    request: Request,
+    session: DatabaseSession,
+) -> Response:
+    user = _get_dashboard_user(
+        request,
+        session,
+    )
+
+    if user is None:
+        return RedirectResponse(
+            url="/login",
+            status_code=(
+                status.HTTP_303_SEE_OTHER
+            ),
+        )
+
+    case_record = _get_visible_case(
+        session,
+        case_id=case_id,
+        user=user,
+    )
+
+    context = _build_case_context(
+        session,
+        case_record=case_record,
+        user=user,
+    )
+
+    context["page_title"] = (
+        case_record.title
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="case_detail.html",
+        context=context,
+    )
+
+
+@router.get(
+    "/dashboard/cases/{case_id}/content",
+    response_class=HTMLResponse,
+)
+def dashboard_case_content(
+    case_id: str,
+    request: Request,
+    session: DatabaseSession,
+) -> Response:
+    user = _require_dashboard_user(
+        request,
+        session,
+    )
+
+    case_record = _get_visible_case(
+        session,
+        case_id=case_id,
+        user=user,
+    )
+
+    return _render_case_content(
+        request,
+        session,
+        case_record=case_record,
+        user=user,
+    )
+
+
+@router.post(
+    "/dashboard/cases/{case_id}/actions/note",
+    response_class=HTMLResponse,
+)
+def dashboard_add_case_note(
+    case_id: str,
+    request: Request,
+    session: DatabaseSession,
+    content: Annotated[
+        str,
+        Form(
+            min_length=1,
+            max_length=20_000,
+        ),
+    ],
+) -> Response:
+    user = _require_dashboard_user(
+        request,
+        session,
+    )
+
+    case_record = _get_visible_case(
+        session,
+        case_id=case_id,
+        user=user,
+    )
+
+    add_case_note(
+        session,
+        case_record=case_record,
+        author_user_id=user.id,
+        content=content.strip(),
+    )
+
+    return _render_case_content(
+        request,
+        session,
+        case_record=case_record,
+        user=user,
+        action_message=(
+            "Analyst note added."
+        ),
+    )
+
+
+@router.post(
+    "/dashboard/cases/{case_id}/actions/status",
+    response_class=HTMLResponse,
+)
+def dashboard_update_case_status(
+    case_id: str,
+    request: Request,
+    session: DatabaseSession,
+    case_status: Annotated[
+        CaseStatus,
+        Form(alias="status"),
+    ],
+) -> Response:
+    user = _require_dashboard_user(
+        request,
+        session,
+    )
+
+    case_record = _get_visible_case(
+        session,
+        case_id=case_id,
+        user=user,
+    )
+
+    set_case_status(
+        session,
+        case_record=case_record,
+        actor_user_id=user.id,
+        new_status=case_status,
+    )
+
+    return _render_case_content(
+        request,
+        session,
+        case_record=case_record,
+        user=user,
+        action_message=(
+            "Case status updated."
+        ),
+    )
+
+
+@router.post(
+    "/dashboard/cases/{case_id}/actions/severity",
+    response_class=HTMLResponse,
+)
+def dashboard_update_case_severity(
+    case_id: str,
+    request: Request,
+    session: DatabaseSession,
+    severity: Annotated[
+        CaseSeverity,
+        Form(),
+    ],
+) -> Response:
+    user = _require_dashboard_user(
+        request,
+        session,
+    )
+
+    case_record = _get_visible_case(
+        session,
+        case_id=case_id,
+        user=user,
+    )
+
+    set_case_severity(
+        session,
+        case_record=case_record,
+        actor_user_id=user.id,
+        new_severity=severity,
+    )
+
+    return _render_case_content(
+        request,
+        session,
+        case_record=case_record,
+        user=user,
+        action_message=(
+            "Case severity updated."
+        ),
+    )
+
+
+@router.post(
+    "/dashboard/cases/{case_id}/actions/assign-self",
+    response_class=HTMLResponse,
+)
+def dashboard_assign_case_to_self(
+    case_id: str,
+    request: Request,
+    session: DatabaseSession,
+) -> Response:
+    user = _require_dashboard_user(
+        request,
+        session,
+    )
+
+    case_record = _get_visible_case(
+        session,
+        case_id=case_id,
+        user=user,
+    )
+
+    assign_case(
+        session,
+        case_record=case_record,
+        actor_user_id=user.id,
+        assigned_to_user_id=user.id,
+    )
+
+    return _render_case_content(
+        request,
+        session,
+        case_record=case_record,
+        user=user,
+        action_message=(
+            "Case assigned to you."
+        ),
+    )
+
+
+@router.post(
+    "/dashboard/cases/{case_id}/actions/unassign",
+    response_class=HTMLResponse,
+)
+def dashboard_unassign_case(
+    case_id: str,
+    request: Request,
+    session: DatabaseSession,
+) -> Response:
+    user = _require_dashboard_user(
+        request,
+        session,
+    )
+
+    case_record = _get_visible_case(
+        session,
+        case_id=case_id,
+        user=user,
+    )
+
+    can_unassign = (
+        _is_admin(user)
+        or case_record.created_by_user_id
+        == user.id
+    )
+
+    if not can_unassign:
+        return _render_case_content(
+            request,
+            session,
+            case_record=case_record,
+            user=user,
+            action_error=(
+                "Only the case creator or an "
+                "administrator can unassign "
+                "this case."
+            ),
+        )
+
+    assign_case(
+        session,
+        case_record=case_record,
+        actor_user_id=user.id,
+        assigned_to_user_id=None,
+    )
+
+    return _render_case_content(
+        request,
+        session,
+        case_record=case_record,
+        user=user,
+        action_message=(
+            "Case assignment removed."
         ),
     )
