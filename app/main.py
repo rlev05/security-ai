@@ -1,5 +1,6 @@
+from urllib.parse import urlsplit
 from fastapi import FastAPI, Request
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from app.api.analysis import router as analysis_router
 from app.api.auth import router as auth_router
@@ -22,6 +23,137 @@ app.mount(
     StaticFiles(directory="app/static"),
     name="static",
 )
+
+SAFE_HTTP_METHODS = {
+    "GET",
+    "HEAD",
+    "OPTIONS",
+}
+
+def _is_dashboard_browser_path(
+        path: str
+) -> bool:
+    """
+    Return True for browser-dashboard routes that use
+    cookie-based authentication.
+
+    Bearer-token API routes are intentionally excluded.
+    """
+
+    return (
+        path == "/login"
+        or path == "/logout"
+        or path == "/dashboard"
+        or path.startswith("/dashboard/")
+    )
+
+def _request_origin(
+        request: Request,
+) -> str:
+    """
+    Return the origin represented by the incoming request.
+    """
+
+    return  (
+        f"{request.url.scheme}://"
+        f"{request.url.netloc}"
+    )
+
+def _same_origin(
+        candidate: str,
+        expected: str,
+) -> bool:
+    """
+    Compare two origins by scheme and network location.
+
+    Paths, queries and fragments are intentionally ignored.
+    """
+
+    try:
+        candidate_url = urlsplit(candidate)
+        expected_url = urlsplit(expected)
+    except ValueError:
+        return False
+
+    return (
+        candidate_url.scheme.lower() == expected_url.scheme.lower()
+        and
+        candidate_url.netloc.lower() == expected_url.netloc.lower()
+    )
+
+def _csrf_request_is_allowed(
+        request: Request,
+) -> bool:
+    """
+    Validate browser metadata for a state-changing
+    cookie-authenticated dashboard request.
+
+    This complements SameSite=Strict cookies.
+
+    Modern browsers send Sec-Fetch-Site and/or Origin/
+    Referer information. Cross-site browser requests are
+    rejected before dashboard route logic executes.
+
+    Requests without these optional browser headers remain
+    accepted. This preserves support for trusted non-browser
+    clients and the application's TestClient while the
+    SameSite cookie continues to provide an independent
+    browser-level CSRF boundary.
+    """
+
+    fetch_site = (request.headers.get("sec-fetch-site"))
+
+    if (
+        fetch_site is not None
+        and fetch_site.lower() == "cross-site"
+    ):
+        return False
+
+    expected_origin = _request_origin(request)
+
+    origin = request.headers.get("origin")
+
+    if origin:
+        return _same_origin(origin, expected_origin)
+
+    referer = request.headers.get("referer")
+
+    if referer:
+        return _same_origin(referer, expected_origin)
+
+    return True
+
+
+@app.middleware("http")
+async def dashboard_csrf_protection(
+        request: Request,
+        call_next,
+) -> Response:
+    """
+    Reject cross-site state-changing requests targeting
+    cookie-authenticated dashboard routes.
+
+    API routes using Bearer authentication are not subject
+    to this browser-specific protection.
+    """
+
+    if (
+        request.method.upper()
+        not in SAFE_HTTP_METHODS
+        and _is_dashboard_browser_path(request.url.path)
+        and not _csrf_request_is_allowed(request)
+    ):
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": (
+                    "Cross-site dashboard "
+                    "request rejected."
+                )
+            },
+        )
+
+    return await call_next(request)
 
 
 @app.middleware("http")
