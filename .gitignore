@@ -1,26 +1,65 @@
-# Virtual environment
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Python virtual environments
 .venv/
+venv/
+env/
 
-# PyCharm
-.idea/
-
-# Python
+# Python bytecode
 __pycache__/
 *.py[cod]
+*$py.class
 
-# Environment variables
-.env
+# Python build output
+build/
+dist/
+*.egg-info/
+.eggs/
 
-# Testing
+# Test / coverage output
 .pytest_cache/
 .coverage
+.coverage.*
+htmlcov/
+coverage.xml
 
-# Ruff
+# Type checker / linter caches
+.mypy_cache/
 .ruff_cache/
 
-# Mypy
-.mypy_cache/
+# IDEs
+.idea/
+.vscode/
 
-#db
+# Local databases
 security_ai.db
-security_ai.db-journal
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# Local secrets / credentials
+*.pem
+*.key
+
+# Keep dependency lock committed
+!requirements-lock.txt

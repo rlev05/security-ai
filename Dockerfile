@@ -15,6 +15,16 @@ COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini .
 
+RUN groupadd --system securityai \
+    && useradd \
+        --system \
+        --gid securityai \
+        --home-dir /app \
+        securityai \
+    && chown -R securityai:securityai /app
+
+USER securityai
+
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
