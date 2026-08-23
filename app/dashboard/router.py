@@ -679,7 +679,7 @@ def login(
         value=token,
         httponly=True,
         samesite="strict",
-        secure=False,
+        secure=settings.dashboard_cookie_secure,
         max_age=(
             settings
             .access_token_expire_minutes

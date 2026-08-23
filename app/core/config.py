@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
-from pydantic import Field, SecretStr
+from typing import Literal
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Literal
 from pydantic import model_validator
@@ -20,6 +21,12 @@ class Settings(BaseSettings):
 
     # Application
     app_name: str = "Security AI"
+
+    app_environment: Literal[
+        "development",
+        "test",
+        "production",
+    ] = "development"
 
     # Database
     #
@@ -84,6 +91,21 @@ class Settings(BaseSettings):
     threat_intel_timeout_seconds: int = 10
 
     threat_intel_cache_ttl_hours: int = 24
+
+
+    @property
+    def dashboard_cookie_secure(
+            self,
+    ) -> bool:
+        """
+        Require HTTPS-only dashboard cookies in production.
+
+        Local HTTP development remains usable without needing
+        separate configuration.
+        """
+
+        return self.app_environment == "production"
+
 
     @model_validator(mode="after")
     def build_database_url(
