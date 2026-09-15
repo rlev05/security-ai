@@ -1,11 +1,12 @@
-# Threat Intelligence Enrichment
+# Threat-intelligence enrichment
 
-The Security AI Platform extracts indicators of compromise from stored security
-analysis data before generating an AI investigation report.
+Threat intelligence is optional supporting context for an investigation. It is not part of the core detection decision and it is not treated as proof that an observed event is malicious.
 
-## Supported indicators
+The application extracts indicators from stored analysis data, normalises and deduplicates them, then sends only eligible indicators to the configured provider.
 
-The extraction layer currently recognizes:
+## Indicator extraction
+
+The IOC layer currently recognises:
 
 - IPv4 addresses
 - domains
@@ -13,84 +14,50 @@ The extraction layer currently recognizes:
 - SHA-1 hashes
 - SHA-256 hashes
 
-The extraction layer is provider-independent.
+Extraction is provider-independent. A provider only receives an indicator after the local extraction and eligibility checks have already run.
 
-## External enrichment
+## AbuseIPDB
 
-The initial external provider is AbuseIPDB.
+v1.0 includes an AbuseIPDB provider for public IPv4 enrichment.
 
-Only public IP addresses are eligible for AbuseIPDB enrichment.
+Private, loopback, link-local, reserved and other non-global addresses are filtered out locally and are not submitted. Complete logs are never sent to AbuseIPDB; the provider receives the individual IP address being checked.
 
-Private, loopback, link-local, reserved and otherwise non-global IP addresses
-are not sent to external providers.
+The provider can be disabled completely through configuration, which is the default development posture unless an API key and provider setting are supplied.
 
-Complete logs are never sent to the threat-intelligence service.
+## Cache behaviour
 
-## Investigation pipeline
+Successful enrichment results are stored in PostgreSQL. The default cache lifetime is 24 hours, so repeated investigations involving the same provider and indicator can reuse a recent result without another external request.
 
-Stored analysis
+Failed lookups are also recorded for visibility, but a failed result is not considered a valid positive cache entry.
 
-→ IOC extraction
-
-→ indicator normalization and deduplication
-
-→ public-IP validation
-
-→ PostgreSQL enrichment cache
-
-→ optional AbuseIPDB lookup
-
-→ MITRE ATT&CK retrieval
-
-→ structured AI investigation
-
-→ grounding validation
-
-→ persistence
-
-## Caching
-
-Successful enrichment results are cached in PostgreSQL.
-
-The default cache lifetime is 24 hours.
-
-Repeated investigations involving the same provider and indicator can therefore
-reuse a recent reputation result without performing another external request.
-
-Failed lookups are persisted for visibility but are not treated as valid cache
-entries.
+This matters because "the provider could not answer" and "the provider returned no concerning reputation" are not the same thing.
 
 ## Failure handling
 
-Threat-intelligence enrichment is supporting context rather than a hard
-dependency.
+Threat-intelligence enrichment is deliberately non-blocking for AI investigations.
 
-If a provider is unavailable:
+If the provider is unavailable, the failed enrichment is added to the investigation context and report generation can continue. The report instructions make it clear that a failed or skipped enrichment must not be interpreted as a clean reputation result.
 
-- the indicator is marked as failed
-- the failure is included in the investigation context
-- AI report generation continues
+## Data flow
 
-A failed enrichment is never interpreted as evidence that an indicator is safe.
+The relevant part of the pipeline is:
 
-## Evidence separation
+```text
+stored analysis
+    -> IOC extraction
+    -> normalisation / deduplication
+    -> eligibility checks
+    -> PostgreSQL cache
+    -> optional external lookup
+    -> investigation evidence
+```
 
-AI investigations distinguish:
+ATT&CK retrieval and AI generation happen later. Threat intelligence is kept as its own evidence category so a reputation score cannot silently become a deterministic detection conclusion.
 
-- observed evidence
-- deterministic detection conclusions
-- MITRE ATT&CK knowledge
-- threat-intelligence enrichment
-- AI inference
+## Privacy and queueing
 
-Threat-intelligence reputation is supporting context and does not by itself
-prove that an IP address was responsible for malicious activity.
+Redis task messages contain only the investigation report ID. The worker loads the analysis from PostgreSQL, extracts indicators locally and submits eligible values to the configured provider.
 
-## Privacy
+Raw logs and complete analysis payloads are not placed on the Celery queue and are not sent to the threat-intelligence provider.
 
-Task messages sent through Redis continue to contain only the investigation
-report identifier.
-
-The Celery worker retrieves analysis data from PostgreSQL, extracts individual
-indicators locally and only submits eligible indicators to the configured
-provider.
+For an internet-facing deployment, the usual external-service considerations still apply: protect the provider API key, review the provider's data-handling terms, and only enable enrichment if sending eligible indicators outside the application is acceptable for the environment.

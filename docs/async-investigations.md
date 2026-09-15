@@ -1,94 +1,59 @@
-# Asynchronous AI Investigations
+# Asynchronous investigations
 
-AI investigation reports are processed outside the HTTP request lifecycle.
+AI reports are generated in the background. The API records the request and returns quickly; a Celery worker does the slow provider work afterwards.
 
-## Request flow
+This avoids tying up an HTTP request while waiting on Redis, an AI provider or threat-intelligence enrichment.
 
-An authenticated analyst requests an investigation report.
+## Request path
 
-The API:
+When an authenticated user requests an investigation report, the API first checks that the user can access the stored analysis. It then creates an investigation-report row in PostgreSQL with a `pending` status and sends only that report ID to the Celery queue.
 
-1. verifies access to the stored analysis
-2. creates a pending investigation report in PostgreSQL
-3. sends only the report ID to the Redis task queue
-4. returns HTTP 202 Accepted
+If the queue accepts the task, the endpoint returns `202 Accepted`.
 
-The API does not wait for the language model.
+If Redis is unavailable and the task cannot be queued, the report is marked as failed and the API returns `503 Service Unavailable`. This prevents a report from being left in a misleading pending state when no worker can ever receive it.
 
-## Worker flow
+## Worker path
 
-A Celery worker receives the report ID and:
+The Celery worker receives the report ID, reloads the report and associated analysis from PostgreSQL, builds the investigation evidence, gathers ATT&CK context and optional threat-intelligence data, then calls the configured AI provider.
 
-1. loads the pending report from PostgreSQL
-2. loads the associated security analysis
-3. retrieves trusted MITRE ATT&CK grounding
-4. calls the configured AI provider
-5. validates generated ATT&CK references
-6. stores the grounded report
-7. updates the report status to completed
+A successful result is validated and persisted before the report status moves to `completed`. Provider errors, validation failures and other processing errors move the report to `failed` with an error message recorded in PostgreSQL.
 
-Provider or validation failures are stored as failed reports.
+The normal lifecycle is therefore:
 
-## Components
+```text
+pending -> completed
+        \
+         -> failed
+```
 
-FastAPI
-→ receives requests and handles authentication
+PostgreSQL is the source of truth for report state. Celery result storage is not used as the application's report database.
 
-PostgreSQL
-→ source of truth for users, analyses and report status
+## Why Redis messages are small
 
-Redis
-→ task-message broker
+The queue payload contains the investigation report identifier rather than the full analysis.
 
-Celery
-→ background task processing
+That keeps raw logs, user information, API keys and large analysis payloads out of Redis. The worker loads the authoritative data directly from PostgreSQL when it starts the task.
 
-MITRE ATT&CK repository
-→ trusted cybersecurity grounding
+It also means the task sees the stored analysis in the same form used by the rest of the application rather than relying on a second copy embedded in a queue message.
 
-AI provider
-→ structured investigation generation
+## Duplicate delivery
 
-## Report lifecycle
+Workers only process reports that are still pending. If the same task is delivered again after a report has already completed or failed, the worker does not generate a second report for the same record.
 
-Reports move through the following states:
+This is a small but useful protection against the at-least-once delivery behaviour common to background queues.
 
-    pending
-       |
-       +----> completed
-       |
-       +----> failed
+## Reading report status
 
-PostgreSQL is the authoritative source for these states.
+The latest investigation report for an analysis is available through:
 
-Celery result storage is not used.
+```text
+GET /analysis/history/{analysis_id}/ai-report
+```
 
-## Idempotency
+The dashboard uses the same stored state when it displays investigation progress and results.
 
-A worker only processes reports with a pending status.
+## Runtime components
 
-Reports that are already completed or failed are not processed again.
+FastAPI owns authentication, authorisation and report creation. PostgreSQL stores analyses and report state. Redis is the Celery broker. The worker performs enrichment and generation. The local ATT&CK repository supplies trusted technique context, while external AI and threat-intelligence providers are optional integrations.
 
-This prevents duplicate task delivery from generating duplicate investigation
-results.
-
-## Failure handling
-
-If Redis cannot accept a task, the API records the report as failed and returns
-HTTP 503.
-
-If background processing fails after the task has been accepted, the worker
-records the failure in PostgreSQL.
-
-The client can retrieve the latest state through:
-
-    GET /analysis/history/{analysis_id}/ai-report
-
-## Security
-
-Task messages contain only the investigation report identifier.
-
-Raw logs, user credentials, API keys and complete analysis results are not sent
-through Redis.
-
-The worker retrieves authoritative investigation data directly from PostgreSQL.
+If AI is disabled, the rest of the analysis platform continues to work normally; only report generation is unavailable.

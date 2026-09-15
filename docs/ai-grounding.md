@@ -1,77 +1,69 @@
-# Grounded AI Investigation Pipeline
+# AI grounding
 
-The Security AI Platform combines deterministic security detections with
-retrieved MITRE ATT&CK knowledge before requesting an AI investigation report.
+The AI investigation feature sits at the end of the analysis pipeline, not at the beginning. Security AI does not ask a model to look at a raw log and decide what happened. Parsing and deterministic detections run first, and the report is generated from the evidence that already exists in the application.
 
-## Trust model
+That distinction is important because it gives the report a fixed evidence boundary.
 
-The language model does not decide which ATT&CK techniques initially apply.
+## Where ATT&CK mappings come from
 
-Technique IDs originate from deterministic detection rules. The platform then
-retrieves matching records from a locally stored MITRE ATT&CK snapshot.
+ATT&CK technique IDs originate in the deterministic detection layer. When a rule identifies behaviour such as password spraying or brute-force activity, the application records the technique IDs associated with that rule.
 
-Only this retrieved knowledge is supplied to the AI provider.
+Before an AI report is generated, those IDs are looked up in the project's local Enterprise ATT&CK snapshot. Only the retrieved technique records are supplied to the provider. The model is not asked to discover extra ATT&CK mappings on its own.
 
-Generated ATT&CK references are validated again after generation. A report that
-references a technique outside the retrieved context is rejected.
+After generation, the report is checked again. A report that references an ATT&CK technique outside the supplied grounding context is rejected rather than silently accepted.
 
-## Investigation pipeline
+The pipeline is roughly:
 
-Authentication log
+```text
+authentication log
+    -> parser
+    -> structured security events
+    -> deterministic detections
+    -> incidents / alerts
+    -> ATT&CK technique IDs
+    -> local ATT&CK lookup
+    -> investigation evidence
+    -> AI provider
+    -> structured report validation
+    -> persistence
+```
 
-→ parsing
+## Keeping evidence types separate
 
-→ security events
+The investigation schema distinguishes between several kinds of information instead of flattening everything into one narrative:
 
-→ deterministic detection rules
+- observations taken from the stored analysis
+- conclusions produced by deterministic detections
+- ATT&CK knowledge retrieved by the application
+- threat-intelligence context, when enabled
+- AI-generated interpretation
 
-→ incidents and alerts
+This makes it harder for generated text to be mistaken for an original log observation. It also makes missing evidence easier to call out explicitly.
 
-→ ATT&CK technique IDs
+## Local ATT&CK data
 
-→ local MITRE ATT&CK retrieval
+The repository contains a local Enterprise ATT&CK snapshot generated from MITRE's STIX 2.1 data. v1.0 pins version 19.1 so that investigations and tests are reproducible instead of changing whenever upstream ATT&CK content changes.
 
-→ grounded AI context
+To refresh the snapshot:
 
-→ structured AI investigation report
+```powershell
+python scripts/update_attack_knowledge.py
+```
 
-→ grounding validation
+The ATT&CK licence file is stored next to the generated data and should remain there when the snapshot is updated.
 
-→ persistence
+## Prompt-injection and output controls
 
-## Evidence separation
+Log content is treated as evidence, not as instructions. Usernames, hostnames, IP addresses, raw messages and other values are placed inside the investigation context as untrusted data.
 
-AI reports label statements as one of:
+The provider instructions explicitly tell the model not to follow instructions found inside logs and not to invent events, infrastructure, identities, malware, vulnerabilities, attacker motives or additional ATT&CK techniques.
 
-- observed evidence
-- detection-engine conclusion
-- ATT&CK knowledge
-- AI inference
+The returned report is parsed into a structured Pydantic model. Invalid structured output fails the investigation instead of being stored as a successful report.
 
-This prevents model-generated interpretation from being presented as if it were
-raw security evidence.
+The application also stores the grounding context used for the report. That gives an analyst a record of the material the model was allowed to use when the report was produced.
 
-## ATT&CK data
+## What grounding does not guarantee
 
-The local Enterprise ATT&CK snapshot is generated from the official MITRE ATT&CK
-STIX 2.1 dataset.
+Grounding reduces the amount of freedom the model has, but it does not turn generated text into fact. The report is still an analyst aid and should be read alongside the original analysis, detections and case notes.
 
-The project currently pins ATT&CK version 19.1 for reproducibility.
-
-Refresh the local snapshot with:
-
-    python scripts/update_attack_knowledge.py
-
-The generated ATT&CK license file is stored alongside the local dataset.
-
-## AI safety controls
-
-The investigation layer:
-
-- treats log content as untrusted input
-- does not follow instructions contained inside logs
-- validates structured AI output
-- restricts ATT&CK references to retrieved techniques
-- records missing evidence and limitations
-- stores the grounding context used for each investigation
-- records failed generation attempts
+A high-confidence report should still be traceable back to supplied evidence. When the available evidence is weak or incomplete, the report schema has explicit places for evidence gaps and limitations rather than encouraging the model to fill them in.

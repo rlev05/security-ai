@@ -1,204 +1,79 @@
-# Analyst Case Management
+# Analyst cases
 
-The Security AI platform supports persistent analyst cases for grouping security
-analysis results into a longer-running investigation.
+Cases are the part of Security AI used for work that lasts longer than a single analysis. An analyst can group related analyses, keep notes, assign responsibility and track how an investigation changes over time.
 
-A case acts as the investigation workspace around one or more security analyses.
-It allows analysts to track ownership, severity, workflow state, notes and an
-append-only activity timeline.
+The original analysis records remain intact. A case stores links to them rather than copying or replacing the underlying results.
 
-## Case lifecycle
+## Case state
 
-Cases begin in the `OPEN` state.
+A new case starts as `OPEN`. The supported states are:
 
-Supported workflow states are:
+```text
+OPEN
+INVESTIGATING
+CONTAINED
+RESOLVED
+CLOSED
+```
 
-- `OPEN`
-- `INVESTIGATING`
-- `CONTAINED`
-- `RESOLVED`
-- `CLOSED`
+Closing a case records a closure time. Reopening it clears that timestamp so the current state is not contradicted by an old close date.
 
-Closing a case records a closure timestamp. Reopening a closed case clears the
-previous closure timestamp.
+Case severity is assigned separately from individual alert severity. The available values are `LOW`, `MEDIUM`, `HIGH` and `CRITICAL`. That gives the analyst room to judge the whole investigation instead of inheriting the highest severity from one detection automatically.
 
-## Severity
+## Visibility and assignment
 
-Cases support the following analyst-assigned severity levels:
+A normal user can see a case when they created it or when the case is currently assigned to them. Administrators can access all cases.
 
-- `LOW`
-- `MEDIUM`
-- `HIGH`
-- `CRITICAL`
+Assignments can be changed to another active user or cleared. This supports a simple hand-off workflow without making every case visible to every account.
 
-Case severity is separate from the severity of individual detections or alerts.
-This allows an analyst to represent the overall investigation risk using the
-combined evidence available in the case.
+For normal users, inaccessible cases return `404 Not Found`. The API does not use a different response that would reveal that a hidden case exists.
 
-## Analysis linking
+## Linking analyses
 
-Existing security analyses can be linked to cases.
+An existing stored analysis can be linked to a case as long as the user is allowed to access that analysis. The same analysis cannot be linked to the same case twice; duplicate links return `409 Conflict`.
 
-A linked analysis retains its original persisted analysis record while the case
-stores the relationship between the investigation and that analysis.
+Ownership checks are applied at link time, so having access to a case does not let a user attach somebody else's private analysis to it.
 
-The API prevents the same analysis from being linked to the same case more than
-once.
+## Notes and timeline
 
-Normal users may only link analysis records that they are authorised to access.
-Administrators retain their wider analysis visibility.
+Analyst notes are stored separately from AI-generated reports. This is intentional: a human conclusion should remain distinguishable from generated investigation text.
 
-## Analyst assignment
+Each note records its author, case, content and creation time.
 
-A case can optionally be assigned to an active user.
+Cases also have an append-only activity timeline. It records important changes such as case creation, analysis links, notes, assignment changes, status changes and severity changes. Timeline entries store the actor and structured metadata about the change. For example, a status event records both the previous and new values.
 
-Normal case visibility is granted when the authenticated user is either:
+A note timeline event references the note ID rather than duplicating the note body.
 
-- the user who created the case; or
-- the user currently assigned to the case.
+## API endpoints
 
-Administrators can access all cases.
+The authenticated case API includes:
 
-This allows an investigation to be handed to another analyst while preventing
-unrelated users from browsing case information.
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/cases` | Create a case |
+| `GET` | `/cases` | List cases visible to the current user |
+| `GET` | `/cases/{case_id}` | Return case detail, linked analyses, notes and timeline |
+| `POST` | `/cases/{case_id}/analyses` | Link an existing analysis |
+| `POST` | `/cases/{case_id}/notes` | Add an analyst note |
+| `PATCH` | `/cases/{case_id}/assignment` | Change or clear assignment |
+| `PATCH` | `/cases/{case_id}/status` | Change workflow status |
+| `PATCH` | `/cases/{case_id}/severity` | Change overall case severity |
 
-## Analyst notes
-
-Visible case participants can append human-written investigation notes.
-
-Notes are stored independently from AI-generated investigation reports so the
-platform clearly separates analyst conclusions from AI-assisted output.
-
-Each note records:
-
-- its case;
-- the author;
-- the note content; and
-- its creation time.
-
-## Investigation timeline
-
-Cases maintain an append-only timeline of important workflow activity.
-
-Currently recorded event types include:
-
-- case creation;
-- analysis linking;
-- analyst notes;
-- assignment changes;
-- status changes; and
-- severity changes.
-
-Timeline events record the actor and structured metadata describing the change.
-For example, a status change records both the previous status and the new status.
-
-The note timeline event stores the note identifier rather than duplicating the
-note contents.
-
-## API
-
-Case management is exposed through authenticated FastAPI endpoints.
-
-### Create a case
-
-`POST /cases`
-
-Creates a new investigation case.
-
-### List visible cases
-
-`GET /cases`
-
-Returns cases created by or assigned to the authenticated user.
-
-Administrators can list all cases.
-
-### Get case detail
-
-`GET /cases/{case_id}`
-
-Returns the case together with:
-
-- linked analyses;
-- analyst notes; and
-- investigation timeline events.
-
-### Link an analysis
-
-`POST /cases/{case_id}/analyses`
-
-Links an authorised persisted security analysis to the case.
-
-Duplicate links return HTTP `409 Conflict`.
-
-### Add an analyst note
-
-`POST /cases/{case_id}/notes`
-
-Adds a human analyst note and records the action in the case timeline.
-
-### Change assignment
-
-`PATCH /cases/{case_id}/assignment`
-
-Assigns the case to an active user or removes the current assignment.
-
-### Change status
-
-`PATCH /cases/{case_id}/status`
-
-Moves the case through the investigation workflow.
-
-### Change severity
-
-`PATCH /cases/{case_id}/severity`
-
-Updates the overall analyst-assigned case severity.
-
-## Security behaviour
-
-Case endpoints require authentication.
-
-For normal users, inaccessible cases return HTTP `404 Not Found` rather than
-revealing that another user's case exists.
-
-Analysis linking also applies analysis ownership checks so a user cannot attach
-another user's private analysis to a case they control.
-
-Administrator access is handled through the existing application role model.
+The dashboard exposes the same case workflow for browser users.
 
 ## Persistence
 
-Case management uses four persistent database structures:
+Case data is split across four database structures:
 
 - `cases`
 - `case_analysis_links`
 - `case_notes`
 - `case_timeline_events`
 
-The associated Alembic migration creates these structures alongside their
-foreign-key relationships to users and persisted analysis records.
+Deleting a case removes its links, notes and timeline entries. User references use `SET NULL` where appropriate so historical investigation records can survive the deletion of a user account.
 
-Deleting a case cascades to its analysis links, notes and timeline events.
+The schema is created through Alembic alongside the rest of the application database.
 
-User references use `SET NULL` so historical investigation records can remain
-available if a referenced user record is removed.
+## Test coverage
 
-## Testing
-
-The case API test suite covers:
-
-- case creation and retrieval;
-- user isolation;
-- linking an owned analysis;
-- duplicate link prevention;
-- blocking another user's analysis;
-- analyst assignment;
-- assigned-user access;
-- analyst notes;
-- status and severity timeline tracking;
-- closure timestamps; and
-- administrator access.
-
-These tests run alongside the existing authentication, detection, AI
-investigation, MITRE ATT&CK grounding and threat-intelligence test suites.
+The case tests cover creation, retrieval, user isolation, administrator visibility, analysis ownership, duplicate links, assignment, assigned-user access, notes, timeline changes and closure timestamps.
